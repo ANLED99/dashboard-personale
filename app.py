@@ -2,6 +2,8 @@ from datetime import datetime
 import os
 import pandas as pd
 import requests
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 import streamlit as st
 
 # Configurazione della pagina
@@ -9,8 +11,10 @@ st.set_page_config(
     page_title="Google Command Center", page_icon="🌐", layout="wide"
 )
 
-# --- CONFIGURAZIONE TOKEN E CREDENZIALI ---
-TOKEN_API = "spak_52Sikt8VNvM9et46Hxa6cR21vadU1Q4f"
+# --- CONFIGURAZIONE CREDENZIALI SPOTIFY API ---
+SPOTIFY_CLIENT_ID = "446a7c20e4b04072a4330fdf2f6d225a"
+SPOTIFY_CLIENT_SECRET = "cba7af42c2874795ab343920a5e7d8d1"
+SPOTIFY_REDIRECT_URI = "http://localhost:8501"
 
 # --- STILE GRAFICO GOOGLE MATERIAL DESIGN & FORZATURA TEMA CHIARO ---
 st.markdown(
@@ -148,7 +152,7 @@ def home_page():
     st.metric(label="📚 Elementi Libreria", value=f"{num_libri}")
 
   st.markdown("---")
-  st.info("💡 Sistema attivo con token API lifestyle configurato correttamente.")
+  st.info("💡 Sistema attivo con autenticazione Spotify API configurata.")
 
 
 def calendario_page():
@@ -406,14 +410,48 @@ def sport_page():
 
 
 def spotify_page():
-  st.title("🎧 Spotify & Monitoraggio Ascolti")
-  tab_manuale, tab_api = st.tabs(
-      ["📊 Inserimento & Storico", "🔌 Connessione API Live"]
+  st.title("🎧 Spotify & Statistiche Live (API)")
+  tab_live, tab_manuale = st.tabs(
+      ["🎵 I tuoi brani più ascoltati (Live)", "📊 Storico Manuale"]
   )
 
   global df_spotify
 
+  with tab_live:
+    st.subheader("Sincronizzazione Automatica Account Spotify")
+    try:
+      auth_manager = SpotifyOAuth(
+          client_id=SPOTIFY_CLIENT_ID,
+          client_secret=SPOTIFY_CLIENT_SECRET,
+          redirect_uri=SPOTIFY_REDIRECT_URI,
+          scope="user-top-read user-read-recently-played",
+          cache_path=".spotify_token_cache",
+      )
+      sp = spotipy.Spotify(auth_manager=auth_manager)
+
+      top_tracks = sp.current_user_top_tracks(limit=10, time_range="medium_term")
+
+      st.success("Connessione a Spotify attiva con successo!")
+      brani_list = []
+      for idx, item in enumerate(top_tracks["items"], 1):
+        brani_list.append({
+            "Posizione": idx,
+            "Brano": item["name"],
+            "Artista": item["artists"][0]["name"],
+            "Album": item["album"]["name"],
+        })
+
+      df_top = pd.DataFrame(brani_list)
+      st.dataframe(df_top, use_container_width=True)
+
+    except Exception as e:
+      st.info(
+          "Autorizza l'accesso al tuo account Spotify cliccando sul link o"
+          f" autenticandoti nel browser. Dettaglio: {e}"
+      )
+
   with tab_manuale:
+    st.subheader("Storico Inserito Manualmente")
     with st.form("f_spot"):
       c1, c2 = st.columns(2)
       with c1:
@@ -439,53 +477,13 @@ def spotify_page():
         st.rerun()
 
     if not df_spotify.empty:
-      st.subheader("Storico Ascolti (Modificabile o Eliminabile)")
       df_spot_mod = st.data_editor(
           df_spotify, num_rows="dynamic", use_container_width=True, key="edit_spot"
       )
-      if st.button("💾 Salva Modifiche Spotify"):
+      if st.button("💾 Salva Modifiche Storico"):
         salva_dati_modulo("spotify.csv", df_spot_mod)
-        st.success("Dati Spotify aggiornati!")
+        st.success("Storico aggiornato!")
         st.rerun()
-
-      if (
-          "Genere Principale" in df_spotify.columns
-          and "Brani Ascoltati" in df_spotify.columns
-      ):
-        st.bar_chart(
-            df_spotify.groupby("Genere Principale")["Brani Ascoltati"].sum()
-        )
-
-  with tab_api:
-    st.subheader("🔌 Stato Connessione API Lifestyle (Spotify)")
-    st.markdown(
-        "Il token API personale (`spak_...`) è configurato e pronto per"
-        " l'interfacciamento con i servizi di streaming e lifestyle."
-    )
-
-    endpoint_test = st.text_input(
-        "Endpoint API da testare:",
-        value="https://api.spotify.com/v1/me",
-        placeholder="Inserisci l'URL dell'endpoint",
-    )
-
-    if st.button("Esegui Test Connessione API"):
-      headers = {
-          "Authorization": f"Bearer {TOKEN_API}",
-          "Content-Type": "application/json",
-      }
-      try:
-        response = requests.get(endpoint_test, headers=headers, timeout=5)
-        if response.status_code == 200:
-          st.success("Connessione API riuscita con successo!")
-          st.json(response.json())
-        else:
-          st.warning(
-              f"Risposta ricevuta dal server (Codice"
-              f" {response.status_code}): {response.text}"
-          )
-      except Exception as e:
-        st.error(f"Errore di connessione: {e}")
 
 
 def lavoro_page():
@@ -515,99 +513,4 @@ def task_page():
       st.rerun()
 
   for idx, task in enumerate(st.session_state.todo_list):
-    c1, c2 = st.columns([0.8, 0.2])
-    with c1:
-      comp = st.checkbox(
-          task["Attività"], value=task["Completata"], key=f"t_{idx}"
-      )
-      st.session_state.todo_list[idx]["Completata"] = comp
-    with c2:
-      if st.button("🗑️ Elimina", key=f"del_task_{idx}"):
-        st.session_state.todo_list.pop(idx)
-        st.rerun()
-
-
-def cultura_page():
-  st.title("📚 Cultura, Libri & Crescita")
-  global df_libri
-
-  with st.form("f_cultura"):
-    tit = st.text_input("Titolo Libro / Corso")
-    tip = st.selectbox("Tipologia", ["Libro", "Corso Online", "Podcast"])
-    stato = st.selectbox("Stato", ["Da Iniziare", "In Corso", "Completato"])
-    voto = st.slider("Valutazione", 1, 10, 8)
-
-    if st.form_submit_button("Aggiungi Elemento"):
-      c_new = pd.DataFrame([{
-          "Titolo": tit,
-          "Tipologia": tip,
-          "Stato": stato,
-          "Voto": voto,
-      }])
-      df_libri = pd.concat([df_libri, c_new], ignore_index=True)
-      salva_dati_modulo("libri.csv", df_libri)
-      st.success("Elemento aggiunto!")
-      st.rerun()
-
-  if not df_libri.empty:
-    st.subheader("Elenco Libreria (Modificabile o Eliminabile)")
-    df_lib_mod = st.data_editor(
-        df_libri, num_rows="dynamic", use_container_width=True, key="edit_lib"
-    )
-    if st.button("💾 Salva Modifiche Libreria"):
-      salva_dati_modulo("libri.csv", df_lib_mod)
-      st.success("Libreria aggiornata!")
-      st.rerun()
-
-
-def link_page():
-  st.title("🔑 Link Vault & Portali Rapidi")
-  global df_link
-
-  with st.form("f_link"):
-    nome = st.text_input("Nome Portale (es. Agenzia Entrate)")
-    url = st.text_input("URL / Link web")
-    note = st.text_input("Note o credenziali")
-    if st.button("Salva Link"):
-      l_new = pd.DataFrame([{"Nome Portale": nome, "URL": url, "Note": note}])
-      df_link = pd.concat([df_link, l_new], ignore_index=True)
-      salva_dati_modulo("link.csv", df_link)
-      st.success("Link salvato!")
-      st.rerun()
-
-  if not df_link.empty:
-    st.subheader("Portali Salvati (Modificabili o Eliminabili)")
-    df_link_mod = st.data_editor(
-        df_link, num_rows="dynamic", use_container_width=True, key="edit_link"
-    )
-    if st.button("💾 Salva Modifiche Link"):
-      salva_dati_modulo("link.csv", df_link_mod)
-      st.success("Link aggiornati!")
-      st.rerun()
-
-
-# --- STRUTTURA DI NAVIGAZIONE ORGANIZZATA CON CALENDARIO ---
-pg = st.navigation({
-    "Panoramica": [
-        st.Page(home_page, title="🏠 Home", default=True),
-        st.Page(calendario_page, title="📅 Calendario & Eventi"),
-    ],
-    "Gestione File & Upload": [
-        st.Page(centro_upload_page, title="📁 Centro Upload & Import")
-    ],
-    "Finanza & Patrimonio": [
-        st.Page(finanze_page, title="💰 Finanze & Abbonamenti")
-    ],
-    "Sport & Passioni": [
-        st.Page(sport_page, title="⚽ Calcio & Match"),
-        st.Page(spotify_page, title="🎧 Spotify & API Live"),
-    ],
-    "Lavoro & Utility": [
-        st.Page(lavoro_page, title="⚡ Lavoro & Workspace"),
-        st.Page(task_page, title="✅ Attività & To-Do"),
-        st.Page(cultura_page, title="📚 Cultura & Libri"),
-        st.Page(link_page, title="🔑 Link & Portali"),
-    ],
-})
-
-pg.run()
+    c1, c2 = st
