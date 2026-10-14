@@ -1,5 +1,3 @@
-
-
 from datetime import datetime
 import os
 import pandas as pd
@@ -150,9 +148,7 @@ def home_page():
     st.metric(label="📚 Elementi Libreria", value=f"{num_libri}")
 
   st.markdown("---")
-  st.info(
-      "💡 Sistema attivo con token API lifestyle configurato correttamente."
-  )
+  st.info("💡 Sistema attivo con token API lifestyle configurato correttamente.")
 
 
 def calendario_page():
@@ -411,7 +407,7 @@ def sport_page():
 
 def spotify_page():
   st.title("🎧 Spotify & Monitoraggio Ascolti")
-  tab_ manuale, tab_api = st.tabs(
+  tab_manuale, tab_api = st.tabs(
       ["📊 Inserimento & Storico", "🔌 Connessione API Live"]
   )
 
