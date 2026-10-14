@@ -4,21 +4,54 @@ import streamlit as st
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="Dashboard Finanziaria & Lavoro", page_icon="⚡", layout="wide"
+    page_title="Dashboard Dinamica Personale", page_icon="⚡", layout="wide"
 )
 
-# --- STILE GRAFICO MODERN (CSS) ---
+# --- INIZIALIZZAZIONE CONFIGURAZIONI DI PERSONALIZZAZIONE (SESSION STATE) ---
+if "tema_colore" not in st.session_state:
+  st.session_state.tema_colore = "Indigo Professionale (#4f46e5)"
+if "bordo_riquadri" not in st.session_state:
+  st.session_state.bordo_riquadri = 12  # px
+if "ombra_box" not in st.session_state:
+  st.session_state.ombra_box = True
+
+# Controllo visibilità sezioni
+if "mostra_home" not in st.session_state:
+  st.session_state.mostra_home = True
+if "mostra_analisi" not in st.session_state:
+  st.session_state.mostra_analisi = True
+if "mostra_archivio" not in st.session_state:
+  st.session_state.mostra_archivio = True
+if "mostra_guide" not in st.session_state:
+  st.session_state.mostra_guide = True
+
+# Mappa dei colori in base alla scelta
+colori_mappa = {
+    "Indigo Professionale (#4f46e5)": "#4f46e5",
+    "Verde Finanza (#059669)": "#059669",
+    "Blu Elettrico (#2563eb)": "#2563eb",
+    "Arancio Caldo (#ea580c)": "#ea580c",
+    "Scuro Elegante (#334155)": "#334155",
+}
+colore_scelto = colori_mappa.get(st.session_state.tema_colore, "#4f46e5")
+ombra_css = (
+    "box-shadow: 0 4px 15px rgba(0,0,0,0.08);"
+    if st.session_state.ombra_box
+    else "box-shadow: none;"
+)
+
+# --- APPLICAZIONE DINAMICA DEGLI STILI CSS ---
 st.markdown(
-    """
+    f"""
     <style>
-    .main { background-color: #f8fafc; }
-    .stMetric {
+    .main {{ background-color: #f8fafc; }}
+    .stMetric {{
         background-color: #ffffff;
         padding: 16px;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-        border-left: 5px solid #4f46e5;
-    }
+        border-radius: {st.session_state.bordo_riquadri}px;
+        {ombra_css}
+        border-left: 6px solid {colore_scelto};
+    }}
     </style>
 """,
     unsafe_allow_html=True,
@@ -28,7 +61,6 @@ st.markdown(
 if "dati_finanziari" not in st.session_state:
   try:
     df_load = pd.read_csv("movimenti_estratti_conto_2026.csv")
-    # Pulizia robusta della colonna importi per evitare errori di tipo
     if "Importo (€)" in df_load.columns:
       df_load["Importo (€)"] = (
           df_load["Importo (€)"]
@@ -62,13 +94,11 @@ def home_page():
   df = st.session_state.dati_finanziari
 
   if not df.empty:
-    # Assicuriamoci che gli importi siano numerici
     df["Importo (€)"] = pd.to_numeric(df["Importo (€)"], errors="coerce")
 
-    # Calcoli KPI avanzati
     entrate_totali = df[df["Importo (€)"] > 0]["Importo (€)"].sum()
     uscite_totali = df[df["Importo (€)"] < 0]["Importo (€)"].sum()
-    bilancio_netto = entrate_totali + uscite_totali  # uscite sono negative
+    bilancio_netto = entrate_totali + uscite_totali
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -86,7 +116,6 @@ def home_page():
 
     st.markdown("---")
 
-    # TOOL 1: Grafico interattivo per Categoria
     st.subheader("📊 Analisi Spese per Categoria")
     col_g1, col_g2 = st.columns([2, 1])
 
@@ -112,30 +141,24 @@ def home_page():
 
     st.markdown("---")
 
-    # TOOL 2: Classifica delle Spese Più Maggiori (Top 5 Outliers)
     st.subheader("🚨 Top 5 Spese Più Rilevanti del Periodo")
     top_spese = df[df["Importo (€)"] < 0].nsmallest(5, "Importo (€)")
     st.dataframe(
         top_spese[["Data", "Descrizione", "Importo (€)", "Categoria"]],
         use_container_width=True,
     )
-
   else:
-    st.warning(
-        "Nessun dato finanziario trovato. Assicurati che il file"
-        " 'movimenti_estratti_conto_2026.csv' sia caricato su GitHub."
-    )
+    st.warning("Nessun dato finanziario trovato nel file CSV.")
 
 
 def analisi_avanzata_page():
   st.title("🔍 Tool di Filtro e Categorizzazione Avanzata")
   st.markdown(
-      "Filtra i movimenti per intervallo di date, categoria o cerca parole"
-      " chiave specifiche nei tuoi estratti conto."
+      "Filtra i movimenti per categoria o cerca parole chiave specifiche nei"
+      " tuoi estratti conto."
   )
 
   df = st.session_state.dati_finanziari
-
   if not df.empty:
     df["Importo (€)"] = pd.to_numeric(df["Importo (€)"], errors="coerce")
     col_f1, col_f2 = st.columns(2)
@@ -143,9 +166,7 @@ def analisi_avanzata_page():
       cat_list = ["Tutte"] + df["Categoria"].dropna().unique().tolist()
       scelta_cat = st.selectbox("Filtra per Categoria:", cat_list)
     with col_f2:
-      testo_ricerca = st.text_input(
-          "Cerca nella descrizione (es. Amazon, Conad, Vinted):"
-      )
+      testo_ricerca = st.text_input("Cerca nella descrizione:")
 
     df_filtrato = df.copy()
     if scelta_cat != "Tutte":
@@ -158,28 +179,18 @@ def analisi_avanzata_page():
       ]
 
     st.markdown(f"Trovate **{len(df_filtrato)}** transazioni corrispondenti:")
-
     st.session_state.dati_finanziari = st.data_editor(
         df_filtrato, num_rows="dynamic", use_container_width=True
     )
-
-    csv_data = df_filtrato.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Scarica Report Filtrato in CSV",
-        data=csv_data,
-        file_name="report_finanziario_filtrato.csv",
-        mime="text/csv",
-    )
   else:
-    st.info("Nessun dato disponibile da analizzare.")
+    st.info("Nessun dato disponibile.")
 
 
 def archivio_file_page():
   st.title("📁 Archivio Documenti e PDF")
   st.markdown("Consulta l'archivio dei documenti caricati nel sistema.")
-
   uploaded_files = st.file_uploader(
-      "Carica altri documenti di supporto:",
+      "Carica altri documenti:",
       accept_multiple_files=True,
       type=["pdf", "docx", "xlsx", "csv"],
   )
@@ -188,8 +199,7 @@ def archivio_file_page():
       st.session_state.archivio_file.append(
           {"Nome File": f.name, "Dimensione": f"{f.size / 1024:.1f} KB"}
       )
-    st.success("File aggiunti all'archivio con successo!")
-
+    st.success("File aggiunti con successo!")
   if st.session_state.archivio_file:
     st.dataframe(
         pd.DataFrame(st.session_state.archivio_file), use_container_width=True
@@ -210,18 +220,105 @@ def guide_lavoro_page():
   )
 
 
-# --- NAVIGAZIONE NATIVA STREAMLIT ---
-pg = st.navigation({
-    "Panoramica & KPI": [
-        st.Page(home_page, title="🏠 Home & Bilancio", default=True)
-    ],
-    "Gestione Finanziaria": [
-        st.Page(analisi_avanzata_page, title="💰 Analisi & Filtri Spese")
-    ],
-    "Archivio & Lavoro": [
-        st.Page(archivio_file_page, title="📁 Archivio File"),
-        st.Page(guide_lavoro_page, title="📚 Guide Lavoro"),
-    ],
-})
+def personalizzazione_page():
+  st.title("🎨 Centro Personalizzazione & Layout")
+  st.markdown(
+      "Modifica l'estetica, la forma dei riquadri e gestisci la visibilità delle"
+      " sezioni direttamente dal sito."
+  )
+  st.markdown("---")
 
-pg.run()
+  col_p1, col_p2 = st.columns(2)
+
+  with col_p1:
+    st.subheader("🎨 Estetica & Stile")
+    st.session_state.tema_colore = st.selectbox(
+        "Colore Principale Accento",
+        [
+            "Indigo Professionale (#4f46e5)",
+            "Verde Finanza (#059669)",
+            "Blu Elettrico (#2563eb)",
+            "Arancio Caldo (#ea580c)",
+            "Scuro Elegante (#334155)",
+        ],
+        index=[
+            "Indigo Professionale (#4f46e5)",
+            "Verde Finanza (#059669)",
+            "Blu Elettrico (#2563eb)",
+            "Arancio Caldo (#ea580c)",
+            "Scuro Elegante (#334155)",
+        ].index(st.session_state.tema_colore),
+    )
+
+    st.session_state.bordo_riquadri = st.slider(
+        "Arrotondamento Riquadri / Card (Pixel)",
+        min_value=0,
+        max_value=30,
+        value=st.session_state.bordo_riquadri,
+    )
+
+    st.session_state.ombra_box = st.checkbox(
+        "Attiva Effetto Ombra sui Riquadri", value=st.session_state.ombra_box
+    )
+
+  with col_p2:
+    st.subheader("📑 Gestione Sezioni (Mostra / Nascondi)")
+    st.session_state.mostra_home = st.checkbox(
+        "🏠 Mostra Home & Bilancio", value=st.session_state.mostra_home
+    )
+    st.session_state.mostra_analisi = st.checkbox(
+        "💰 Mostra Analisi & Filtri Spese",
+        value=st.session_state.mostra_analisi,
+    )
+    st.session_state.mostra_archivio = st.checkbox(
+        "📁 Mostra Archivio File", value=st.session_state.mostra_archivio
+    )
+    st.session_state.mostra_guide = st.checkbox(
+        "📚 Mostra Guide Lavoro", value=st.session_state.mostra_guide
+    )
+
+  st.markdown("---")
+  if st.button("💾 Applica e Salva Modifiche"):
+    st.success("✅ Modifiche estetiche applicate con successo!")
+    st.rerun()
+
+
+# --- COSTRUZIONE DINAMICA DEL MENU DI NAVIGAZIONE ---
+pagine_attive = {}
+
+if st.session_state.mostra_home:
+  pagine_attive["Panoramica & KPI"] = [
+      st.Page(home_page, title="🏠 Home & Bilancio", default=True)
+  ]
+
+finanza_sub = []
+if st.session_state.mostra_analisi:
+  finanza_sub.append(
+      st.Page(analisi_avanzata_page, title="💰 Analisi & Filtri Spese")
+  )
+if finanza_sub:
+  pagine_attive["Gestione Finanziaria"] = finanza_sub
+
+lavoro_sub = []
+if st.session_state.mostra_archivio:
+  lavoro_sub.append(st.Page(archivio_file_page, title="📁 Archivio File"))
+if st.session_state.mostra_guide:
+  lavoro_sub.append(st.Page(guide_lavoro_page, title="📚 Guide Lavoro"))
+if lavoro_sub:
+  pagine_attive["Archivio & Lavoro"] = lavoro_sub
+
+# La pagina di personalizzazione è sempre accessibile per modificare il layout
+pagine_attive["Impostazioni"] = [
+    st.Page(personalizzazione_page, title="🎨 Personalizza Layout")
+]
+
+# Esecuzione della navigazione dinamica
+if pagine_attive:
+  pg = st.navigation(pagine_attive)
+  pg.run()
+else:
+  st.warning(
+      "⚠️ Hai disattivato tutte le sezioni dal pannello di personalizzazione."
+      " Vai su 'Impostazioni' per riattivarne almeno una."
+  )
+  st.Page(personalizzazione_page, title="🎨 Personalizza Layout").run()
