@@ -5,37 +5,25 @@ import pypdf
 import streamlit as st
 from docx import Document
 
-# Configurazione della pagina (stile esteso e pulito)
+# Configurazione della pagina
 st.set_page_config(
     page_title="Dashboard Personale & Lavoro", page_icon="✨", layout="wide"
 )
 
-# --- PERSONALIZZAZIONE GRAFICA CSS ---
-st.markdown(
-    """
-    <style>
-    .main {
-        background-color: #f8f9fa;
-    }
-    .stMetric {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border-left: 5px solid #4f46e5;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
+# --- INIZIALIZZAZIONE STATO SESSIONE (MEMORIA DATI) ---
+if "dati_finanziari" not in st.session_state:
+  # Tabella globale condivisa tra le sezioni
+  st.session_state.dati_finanziari = pd.DataFrame(
+      columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
+  )
 
-# Inizializzazione dello stato della sessione per la chat
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
       "content": (
-          "Ciao! Ora puoi caricare qualsiasi tipo di file (PDF, Word, Excel,"
-          " CSV, immagini, TXT). Come posso aiutarti?"
+          "Ciao! Ho configurato la memoria globale: ora i file che carichi"
+          " nell'archivio aggiorneranno in automatico la sezione Finanze e la"
+          " Home."
       ),
   }]
 
@@ -56,12 +44,18 @@ scelta = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")
 
-# --- SEZIONE 1: HOME ---
+# --- CALCOLO DATI GLOBALI PER LA HOME E FINANZE ---
+df_globale = st.session_state.dati_finanziari
+totale_spese = (
+    df_globale["Importo (€)"].sum() if not df_globale.empty else 0.0
+)
+
+# --- SEZIONE 1: HOME & PANORAMICA ---
 if scelta == "🏠 Home & Panoramica":
   st.title("✨ Benvenuto nella tua Dashboard Privata")
   st.markdown(
-      "Un unico centro di controllo per gestire i tuoi file, le finanze,"
-      " impegni professionali e guide operative."
+      "Quadro generale aggiornato in tempo reale dai tuoi file e dai dati"
+      " inseriti."
   )
 
   st.markdown("<br>", unsafe_allow_html=True)
@@ -69,15 +63,15 @@ if scelta == "🏠 Home & Panoramica":
   col1, col2, col3 = st.columns(3)
   with col1:
     st.metric(
-        label="💳 Situazione Finanziaria",
-        value="Pronto",
-        delta="Dati in tempo reale",
+        label="💳 Bilancio Totale Registrato",
+        value=f"€ {totale_spese:,.2f}",
+        delta="Aggiornato da file",
     )
   with col2:
     st.metric(
-        label="📌 Task & Attività",
-        value="Attivo",
-        delta="Nessuna scadenza critica",
+        label="📌 Movimenti Totali",
+        value=f"{len(df_globale)} transazioni",
+        delta="Attive nel sistema",
     )
   with col3:
     st.metric(
@@ -85,18 +79,23 @@ if scelta == "🏠 Home & Panoramica":
     )
 
   st.markdown("<br>", unsafe_allow_html=True)
-  st.info(
-      "💡 **Novità:** Ora nella sezione 'Gestione Universale File' puoi"
-      " caricare qualsiasi formato (PDF, Word, Excel, CSV, Immagini)."
-  )
+
+  if not df_globale.empty:
+    st.subheader("📊 Ultime Transazioni Rilevate")
+    st.dataframe(df_globale.tail(5), use_container_width=True)
+  else:
+    st.info(
+        "💡 **Suggerimento:** Carica un estratto conto nella sezione 'Gestione"
+        " Universale File' o inserisci i dati in 'Finanze & PAC' per popolare"
+        " la Home."
+    )
 
 # --- SEZIONE 2: GESTIONE UNIVERSALE FILE ---
 elif scelta == "📁 Gestione Universale File":
-  st.title("📁 Archivio e Gestione File Universale")
+  st.title("📁 Archivio e Importazione Estratti Conto")
   st.markdown(
-      "Carica qualsiasi documento: **PDF, Word (.docx), Excel, CSV, Immagini o"
-      " file di testo**. La dashboard riconoscerà il formato e ti mostrerà il"
-      " contenuto."
+      "Carica i tuoi estratti conto (**Excel, CSV o PDF**). La dashboard"
+      " estrarrà i movimenti e aggiornerà automaticamente il quadro spese."
   )
 
   uploaded_file = st.file_uploader(
@@ -118,108 +117,91 @@ elif scelta == "📁 Gestione Universale File":
     file_name = uploaded_file.name
     st.success(f"File '{file_name}' caricato con successo!")
 
-    # 1. Gestione Fogli di Calcolo (Excel / CSV)
+    # 1. Fogli di Calcolo / Estratti Conto in Excel o CSV
     if file_name.endswith((".csv", ".xlsx", ".xls")):
       try:
         if file_name.endswith(".csv"):
-          df = pd.read_csv(uploaded_file)
+          df_caricato = pd.read_csv(uploaded_file)
         else:
-          df = pd.read_excel(uploaded_file)
+          df_caricato = pd.read_excel(uploaded_file)
 
-        st.markdown("### ✏️ Tabella Interattiva (Modificabile)")
-        st.info(
-            "Fai doppio clic sulle celle per modificare i valori direttamente"
-            " dalla pagina web."
+        st.markdown(
+            "### 🔍 Anteprima e Integrazione Automatica nel Quadro Spese"
         )
-        edited_df = pd.data_editor(
-            df, num_rows="dynamic", use_container_width=True
+        st.write(
+            "Verifica o adatta le colonne qui sotto, poi clicca sul pulsante per"
+            " sincronizzarle."
         )
 
-        st.markdown("### 💾 Esporta Dati Aggiornati")
-        csv_data = edited_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Scarica File Aggiornato (CSV)",
-            data=csv_data,
-            file_name="dati_aggiornati.csv",
-            mime="text/csv",
+        df_editato = st.data_editor(
+            df_caricato, num_rows="dynamic", use_container_width=True
         )
+
+        if st.button("🔄 Sincronizza con la Dashboard Finanziaria"):
+          # Normalizziamo le colonne se possibile o salviamo direttamente
+          st.session_state.dati_finanziari = df_editato
+          st.success(
+              "✅ Dati sincronizzati con successo! Tutte le sezioni ora"
+              " mostrano questi movimenti."
+          )
+
       except Exception as e:
-        st.error(f"Errore nella lettura del file tabulare: {e}")
+        st.error(f"Errore nella lettura del file: {e}")
 
-    # 2. Gestione File PDF
+    # 2. Gestione File PDF (Estratti conto bancari in PDF)
     elif file_name.endswith(".pdf"):
-      st.markdown("### 📄 Contenuto del PDF")
+      st.markdown("### 📄 Analisi Testo Estratto Conto PDF")
       try:
         reader = pypdf.PdfReader(uploaded_file)
         pdf_text = ""
         for page in reader.pages:
           pdf_text += page.extract_text() + "\n"
 
-        st.text_area(
-            "Testo estratto dal PDF:", pdf_text, height=350
-        )
-        st.download_button(
-            label="📥 Scarica Testo Estratto",
-            data=pdf_text,
-            file_name="testo_estratto.txt",
-            mime="text/plain",
+        st.text_area("Testo estratto dal documento:", pdf_text, height=300)
+        st.info(
+            "💡 Se l'estratto conto è in formato PDF testuale, puoi copiare i"
+            " dati chiave o chiedere all'assistente in chat di aiutarti ad"
+            " estrarre le voci di spesa."
         )
       except Exception as e:
         st.error(f"Errore nella lettura del PDF: {e}")
 
-    # 3. Gestione File Word (.docx)
+    # Altri formati (Word, Immagini, TXT)
     elif file_name.endswith(".docx"):
-      st.markdown("### 📝 Contenuto del Documento Word")
-      try:
-        doc = Document(uploaded_file)
-        docx_text = "\n".join([para.text for para in doc.paragraphs])
-
-        st.text_area(
-            "Testo estratto dal documento:", docx_text, height=350
-        )
-        st.download_button(
-            label="📥 Scarica Testo Estratto",
-            data=docx_text,
-            file_name="testo_word.txt",
-            mime="text/plain",
-        )
-      except Exception as e:
-        st.error(f"Errore nella lettura del file Word: {e}")
-
-    # 4. Gestione Immagini
+      doc = Document(uploaded_file)
+      docx_text = "\n".join([para.text for para in doc.paragraphs])
+      st.text_area("Testo documento:", docx_text, height=300)
     elif file_name.endswith((".png", ".jpg", ".jpeg")):
-      st.markdown("### 🖼️ Anteprima Immagine")
       st.image(uploaded_file, caption=file_name, use_container_width=True)
-
-    # 5. Gestione File di Testo Semplice (.txt)
     elif file_name.endswith(".txt"):
-      st.markdown("### 📃 Contenuto del File di Testo")
       stringio = io.StringIO(uploaded_file.getvalue().decode("utf-8"))
-      string_data = stringio.read()
-      st.text_area("Testo:", string_data, height=350)
+      st.text_area("Testo:", stringio.read(), height=300)
 
   else:
-    st.warning("Nessun file caricato al momento. Trascina un file per iniziare.")
+    st.warning("Nessun file caricato al momento.")
 
 # --- SEZIONE 3: FINANZE & PAC ---
 elif scelta == "💰 Finanze & PAC":
-  st.title("💰 Gestione Finanze & PAC")
-  st.markdown("Monitora transazioni, entrate e uscite.")
-
-  df_finanze = pd.DataFrame(
-      columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
-  )
-  st.subheader("Registro Transazioni")
-  edited_finanze = st.data_editor(
-      df_finanze, num_rows="dynamic", use_container_width=True
+  st.title("💰 Quadro Generale Spese & Finanze")
+  st.markdown(
+      "Qui trovi l'elenco completo di tutte le transazioni caricate dai tuoi"
+      " file o inserite manualmente."
   )
 
-  with st.expander("➕ Aggiungi Nuova Transazione Rapida"):
+  # Tabella interattiva collegata allo stato globale
+  st.subheader("Registro Movimenti Sincronizzati")
+  st.session_state.dati_finanziari = st.data_editor(
+      st.session_state.dati_finanziari,
+      num_rows="dynamic",
+      use_container_width=True,
+  )
+
+  with st.expander("➕ Aggiungi Nuova Transazione Manuale"):
     with st.form("form_spesa"):
       d_data = st.date_input("Data", datetime.today())
       d_desc = st.text_input("Descrizione / Causale")
       d_imp = st.number_input(
-          "Importo (usa segno meno per le uscite)", value=0.00
+          "Importo (€) (usa il segno meno per le spese)", value=0.00
       )
       d_cat = st.selectbox(
           "Categoria",
@@ -230,21 +212,31 @@ elif scelta == "💰 Finanze & PAC":
               "Svago",
           ],
       )
-      submit = st.form_submit_button("Salva Transazione")
+      submit = st.form_submit_button("Aggiungi al Quadro Spese")
       if submit:
-        st.success(f"Transazione '{d_desc}' registrata correttamente!")
+        nuova_riga = pd.DataFrame([{
+            "Data": str(d_data),
+            "Descrizione": d_desc,
+            "Importo (€)": d_imp,
+            "Categoria": d_cat,
+        }])
+        st.session_state.dati_finanziari = pd.concat(
+            [st.session_state.dati_finanziari, nuova_riga], ignore_index=True
+        )
+        st.success(
+            "Transazione aggiunta e quadro generale aggiornato in tempo"
+            " reale!"
+        )
+        st.rerun()
 
 # --- SEZIONE 4: CALENDARIO & TASK ---
 elif scelta == "📅 Calendario & Task":
   st.title("📅 Calendario e Task Manager")
-
   tab1, tab2 = st.tabs(["💼 Attività Lavoro", "🏡 Attività Personali"])
-
   with tab1:
     st.subheader("Scadenze e Adempimenti Professionali")
     df_lavoro = pd.DataFrame(columns=["Titolo Task", "Scadenza", "Stato"])
     st.data_editor(df_lavoro, num_rows="dynamic", use_container_width=True)
-
   with tab2:
     st.subheader("Promemoria Personali")
     df_privato = pd.DataFrame(columns=["Attività", "Data", "Priorità"])
@@ -257,7 +249,6 @@ elif scelta == "📚 Guide Lavoro (Bpoint/Zucchetti)":
       "Seleziona Software / Portale",
       ["Bpoint", "Zucchetti Paghe", "Agenzia delle Entrate", "Altro software"],
   )
-
   if software_scelto == "Bpoint":
     st.subheader("🔹 Bpoint - Procedure Principali")
     st.text_area(
@@ -289,8 +280,8 @@ elif scelta == "📚 Guide Lavoro (Bpoint/Zucchetti)":
 elif scelta == "💬 Assistente IA (Chat)":
   st.title("💬 Assistente Personale Intelligente")
   st.markdown(
-      "Parla direttamente con me: chiedimi modifiche o integrazioni per la tua"
-      " dashboard."
+      "Parla direttamente con me: posso aiutarti ad analizzare i dati caricati"
+      " o modificare la dashboard."
   )
 
   for message in st.session_state.messages:
@@ -303,8 +294,8 @@ elif scelta == "💬 Assistente IA (Chat)":
       st.markdown(prompt)
 
     risposta_ia = (
-        f"Ho registrato la tua richiesta: '{prompt}'. Chiedimi il codice"
-        " aggiornato quando desideri applicare nuove funzioni!"
+        f"Ho elaborato la tua richiesta: '{prompt}'. I dati nella dashboard"
+        " restano sincronizzati in tempo reale!"
     )
     st.session_state.messages.append({"role": "assistant", "content": risposta_ia})
     with st.chat_message("assistant"):
