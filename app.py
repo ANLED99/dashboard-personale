@@ -426,6 +426,7 @@ def spotify_page():
           redirect_uri=SPOTIFY_REDIRECT_URI,
           scope="user-top-read user-read-recently-played",
           cache_path=".spotify_token_cache",
+          open_browser=False,
       )
       sp = spotipy.Spotify(auth_manager=auth_manager)
       top_tracks = sp.current_user_top_tracks(limit=10, time_range="medium_term")
@@ -442,12 +443,12 @@ def spotify_page():
       st.dataframe(pd.DataFrame(brani_list), use_container_width=True)
 
     except Exception as e:
-      st.info(
-          "Nota di autenticazione API: L'accesso live richiede l'apertura"
-          " del browser di autenticazione. Se utilizzi Streamlit Cloud, gestisci"
-          " i brani tramite il tab Storico Manuale o carica i file dal Centro"
-          f" Upload. (Dettaglio: {e})"
+      st.warning(
+          "⚠️ **Autenticazione richiesta**: L'accesso live richiede il file"
+          " di cache dei token autorizzato. Gestisci i brani tramite il tab"
+          " **Storico Manuale** o carica i file dal **Centro Upload**."
       )
+      st.info(f"Dettaglio tecnico: {e}")
 
   with tab_manuale:
     st.subheader("Storico Inserito Manualmente")
