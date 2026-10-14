@@ -8,41 +8,57 @@ st.set_page_config(
     page_title="Google Command Center", page_icon="🌐", layout="wide"
 )
 
-# --- CREAZIONE CARTELLA DATI PER LA PERSISTENZA ---
-DATA_DIR = "data"
-if not os.path.exists(DATA_DIR):
-  os.makedirs(DATA_DIR)
-
-# --- STILE GRAFICO GOOGLE MATERIAL DESIGN ---
+# --- STILE GRAFICO GOOGLE MATERIAL DESIGN & FORZATURA TEMA CHIARO ---
 st.markdown(
     """
     <style>
-    .main { background-color: #f8f9fa; font-family: 'Roboto', sans-serif; }
-    h1, h2, h3 { color: #202124; font-weight: 500; }
+    /* Forza lo sfondo chiaro e il testo leggibile su tutta la dashboard */
+    .stApp {
+        background-color: #f8f9fa !important;
+        color: #202124 !important;
+    }
+    .main { 
+        background-color: #f8f9fa !important; 
+        font-family: 'Roboto', sans-serif; 
+    }
+    h1, h2, h3, h4, h5, h6, p, span, label { 
+        color: #202124 !important; 
+    }
     .stMetric {
-        background-color: #ffffff;
+        background-color: #ffffff !important;
         padding: 20px;
         border-radius: 12px;
         box-shadow: 0 1px 3px rgba(60,64,67,0.3);
         border: 1px solid #dadce0;
         border-left: 6px solid #1a73e8;
     }
+    .stMetric label {
+        color: #5f6368 !important;
+    }
+    .stMetric [data-testid="stMetricValue"] {
+        color: #202124 !important;
+    }
     .stButton>button {
         border-radius: 8px;
         background-color: #1a73e8;
-        color: white;
+        color: white !important;
         font-weight: 500;
         border: none;
         padding: 8px 16px;
     }
     .stButton>button:hover {
         background-color: #1557b0;
-        color: white;
+        color: white !important;
     }
     </style>
 """,
     unsafe_allow_html=True,
 )
+
+# --- CREAZIONE CARTELLA DATI PER LA PERSISTENZA ---
+DATA_DIR = "data"
+if not os.path.exists(DATA_DIR):
+  os.makedirs(DATA_DIR)
 
 
 # --- FUNZIONE DI CARICAMENTO E SALVATAGGIO DATI ISOLATI ---
@@ -132,7 +148,7 @@ def home_page():
 
   st.markdown("---")
   st.info(
-      "💡 Usa la sezione **Centro Upload** nel menu per caricare file o le altre"
+      "💡 Usa la sezione **Centro Upload** nel menu per caricare file e le altre"
       " sezioni per visualizzare, modificare ed eliminare i dati."
   )
 
@@ -144,7 +160,6 @@ def centro_upload_page():
   )
   st.markdown("---")
 
-  # Mappa delle destinazioni con i rispettivi file di salvataggio
   mappa_destinazioni = {
       "Finanze / Estratto Conto (finanze.csv)": ("finanze.csv", ["Data", "Descrizione", "Importo (€)", "Categoria"]),
       "Abbonamenti & Costi Fissi (abbonamenti.csv)": ("abbonamenti.csv", ["Servizio", "Costo (€)", "Frequenza", "Scadenza"]),
@@ -173,7 +188,6 @@ def centro_upload_page():
         else:
           df_nuovo = pd.read_excel(file_caricato)
 
-        # Legge il file esistente, unisce o sostituisce, e salva
         df_esistente = carica_dati_modulo(nome_file_target, colonne_def)
         df_finale = pd.concat([df_esistente, df_nuovo], ignore_index=True)
         salva_dati_modulo(nome_file_target, df_finale)
@@ -195,7 +209,6 @@ def finanze_page():
   with tab1:
     st.subheader("Movimenti Conto Corrente (Modificabili / Eliminabili)")
     if not df_finanze.empty:
-      # Tabella interattiva per modificare o eliminare righe al volo
       df_finanze_modificato = st.data_editor(
           df_finanze, num_rows="dynamic", use_container_width=True, key="edit_fin"
       )
@@ -267,7 +280,7 @@ def sport_page():
 
       nota = st.text_area(
           "Nota / Commento (supporta dettatura vocale da tastiera):",
-          placeholder="Ticca il microfono per dettare...",
+          placeholder="Tocca il microfono per dettare...",
       )
 
       if st.form_submit_button("Registra Partita"):
@@ -352,4 +365,144 @@ def spotify_page():
       df_spotify = pd.concat([df_spotify, s_new], ignore_index=True)
       salva_dati_modulo("spotify.csv", df_spotify)
       st.success("Dati Spotify salvati!")
-      st.rer
+      st.rerun()
+
+  if not df_spotify.empty:
+    st.subheader("Storico Ascolti (Modificabile o Eliminabile)")
+    df_spot_mod = st.data_editor(
+        df_spotify, num_rows="dynamic", use_container_width=True, key="edit_spot"
+    )
+    if st.button("💾 Salva Modifiche Spotify"):
+      salva_dati_modulo("spotify.csv", df_spot_mod)
+      st.success("Dati Spotify aggiornati!")
+      st.rerun()
+
+    if (
+        "Genere Principale" in df_spotify.columns
+        and "Brani Ascoltati" in df_spotify.columns
+    ):
+      st.bar_chart(
+          df_spotify.groupby("Genere Principale")["Brani Ascoltati"].sum()
+      )
+
+
+def lavoro_page():
+  st.title("⚡ Lavoro & Workspace")
+  tab1, tab2 = st.tabs(["📚 Guide Software", "📝 Note Operative"])
+
+  with tab1:
+    soft = st.selectbox("Software", ["Bpoint", "Zucchetti Paghe", "AdE"])
+    st.text_area(f"Procedure operative per {soft}:", height=200)
+
+  with tab2:
+    st.session_state.note_lavoro = st.text_area(
+        "Blocco note libero (supporta dettatura vocale):",
+        value=st.session_state.note_lavoro,
+        height=250,
+    )
+
+
+def task_page():
+  st.title("✅ Attività & To-Do List")
+  nuovo = st.text_input("Nuova attività da completare:")
+  if st.button("Aggiungi Task"):
+    if nuovo:
+      st.session_state.todo_list.append(
+          {"Attività": nuovo, "Completata": False}
+      )
+      st.rerun()
+
+  for idx, task in enumerate(st.session_state.todo_list):
+    c1, c2 = st.columns([0.8, 0.2])
+    with c1:
+      comp = st.checkbox(
+          task["Attività"], value=task["Completata"], key=f"t_{idx}"
+      )
+      st.session_state.todo_list[idx]["Completata"] = comp
+    with c2:
+      if st.button("🗑️ Elimina", key=f"del_task_{idx}"):
+        st.session_state.todo_list.pop(idx)
+        st.rerun()
+
+
+def cultura_page():
+  st.title("📚 Cultura, Libri & Crescita")
+  global df_libri
+
+  with st.form("f_cultura"):
+    tit = st.text_input("Titolo Libro / Corso")
+    tip = st.selectbox("Tipologia", ["Libro", "Corso Online", "Podcast"])
+    stato = st.selectbox("Stato", ["Da Iniziare", "In Corso", "Completato"])
+    voto = st.slider("Valutazione", 1, 10, 8)
+
+    if st.form_submit_button("Aggiungi Elemento"):
+      c_new = pd.DataFrame([{
+          "Titolo": tit,
+          "Tipologia": tip,
+          "Stato": stato,
+          "Voto": voto,
+      }])
+      df_libri = pd.concat([df_libri, c_new], ignore_index=True)
+      salva_dati_modulo("libri.csv", df_libri)
+      st.success("Elemento aggiunto!")
+      st.rerun()
+
+  if not df_libri.empty:
+    st.subheader("Elenco Libreria (Modificabile o Eliminabile)")
+    df_lib_mod = st.data_editor(
+        df_libri, num_rows="dynamic", use_container_width=True, key="edit_lib"
+    )
+    if st.button("💾 Salva Modifiche Libreria"):
+      salva_dati_modulo("libri.csv", df_lib_mod)
+      st.success("Libreria aggiornata!")
+      st.rerun()
+
+
+def link_page():
+  st.title("🔑 Link Vault & Portali Rapidi")
+  global df_link
+
+  with st.form("f_link"):
+    nome = st.text_input("Nome Portale (es. Agenzia Entrate)")
+    url = st.text_input("URL / Link web")
+    note = st.text_input("Note o credenziali")
+    if st.form_submit_button("Salva Link"):
+      l_new = pd.DataFrame([{"Nome Portale": nome, "URL": url, "Note": note}])
+      df_link = pd.concat([df_link, l_new], ignore_index=True)
+      salva_dati_modulo("link.csv", df_link)
+      st.success("Link salvato!")
+      st.rerun()
+
+  if not df_link.empty:
+    st.subheader("Portali Salvati (Modificabili o Eliminabili)")
+    df_link_mod = st.data_editor(
+        df_link, num_rows="dynamic", use_container_width=True, key="edit_link"
+    )
+    if st.button("💾 Salva Modifiche Link"):
+      salva_dati_modulo("link.csv", df_link_mod)
+      st.success("Link aggiornati!")
+      st.rerun()
+
+
+# --- STRUTTURA DI NAVIGAZIONE ORGANIZZATA ---
+pg = st.navigation({
+    "Panoramica": [st.Page(home_page, title="🏠 Home", default=True)],
+    "Gestione File & Upload": [
+        st.Page(centro_upload_page, title="📁 Centro Upload & Import")
+    ],
+    "Finanza & Patrimonio": [
+        st.Page(finanze_page, title="💰 Finanze & Abbonamenti")
+    ],
+    "Sport & Passioni": [
+        st.Page(sport_page, title="⚽ Calcio & Match"),
+        st.Page(spotify_page, title="🎧 Spotify & Musica"),
+    ],
+    "Lavoro & Utility": [
+        st.Page(lavoro_page, title="⚡ Lavoro & Workspace"),
+        st.Page(task_page, title="✅ Attività & To-Do"),
+        st.Page(cultura_page, title="📚 Cultura & Libri"),
+        st.Page(link_page, title="🔑 Link & Portali"),
+    ],
+})
+
+pg.run()
