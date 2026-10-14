@@ -1,9 +1,5 @@
-# --- BARRA LATERALE COMUNE ---
-st.sidebar.title("⚡ Centro di Controllo")
-st.sidebar.markdown("---")
-st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
 st.set_page_config(
     page_title="Dashboard Personale", page_icon="⚡", layout="wide"
@@ -11,21 +7,20 @@ st.set_page_config(
 
 # Inizializzazione globale della memoria condivisa
 if "dati_finanziari" not in st.session_state:
-  st.session_state.dati_finanziari = pd.DataFrame(
-      columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
-  )
+    st.session_state.dati_finanziari = pd.DataFrame(
+        columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
+    )
 
 if "archivio_file" not in st.session_state:
-  st.session_state.archivio_file = []
+    st.session_state.archivio_file = []
 
 # --- MENU LATERALE AGGIUNTIVO ---
 st.sidebar.title("⚡ Centro di Controllo")
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "📌 **Navigazione Pagine**\nUsa il menu nativo di Streamlit sopra o i"
-    " pulsanti di scelta rapida sottostanti per spostarti."
+    "📌 **Navigazione Pagine**\nUsa il menu sopra o i file della cartella per"
+    " spostarti."
 )
-
 st.sidebar.markdown("---")
 st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")
 
@@ -44,15 +39,15 @@ totale_spese = (
 
 col1, col2, col3 = st.columns(3)
 with col1:
-  st.metric(
-      label="💳 Bilancio Totale Registrato", value=f"€ {totale_spese:,.2f}"
-  )
+    st.metric(
+        label="💳 Bilancio Totale Registrato", value=f"€ {totale_spese:,.2f}"
+    )
 with col2:
-  st.metric(label="📌 Transazioni Attive", value=f"{len(df_globale)}")
+    st.metric(label="📌 Transazioni Attive", value=f"{len(df_globale)}")
 with col3:
-  st.metric(
-      label="📚 File Storicizzati", value=f"{len(st.session_state.archivio_file)}"
-  )
+    st.metric(
+        label="📚 File Storicizzati", value=f"{len(st.session_state.archivio_file)}"
+    )
 
 st.info(
     "💡 **Suggerimento:** Seleziona la sezione desiderata dal menu laterale"
