@@ -129,7 +129,9 @@ def analisi_avanzata_page():
       cat_list = ["Tutte"] + df["Categoria"].dropna().unique().tolist()
       scelta_cat = st.selectbox("Filtra per Categoria:", cat_list)
     with col_f2:
-      testo_ricerca = st.text_input("Cerca nella descrizione (es. Amazon, Conad, Vinted):")
+      testo_ricerca = st.text_input(
+          "Cerca nella descrizione (es. Amazon, Conad, Vinted):"
+      )
 
     df_filtrato = df.copy()
     if scelta_cat != "Tutte":
@@ -186,7 +188,9 @@ def archivio_file_page():
 
 def guide_lavoro_page():
   st.title("📚 Guide Operative Lavoro (Bpoint / Zucchetti)")
-   software = st.selectbox("Seleziona Software", ["Bpoint", "Zucchetti Paghe", "AdE"])
+  software = st.selectbox(
+      "Seleziona Software", ["Bpoint", "Zucchetti Paghe", "AdE"]
+  )
   st.text_area(
       f"Note e procedure per {software}:",
       placeholder="Inserisci qui i tuoi promemoria...",
