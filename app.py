@@ -16,6 +16,8 @@ if "ombra_box" not in st.session_state:
   st.session_state.ombra_box = True
 if "sfondo_card" not in st.session_state:
   st.session_state.sfondo_card = "#ffffff"
+if "colore_testo_card" not in st.session_state:
+  st.session_state.colore_testo_card = "#0f172a"
 
 # Personalizzazione Testi & Blocchi della Home
 if "home_titolo" not in st.session_state:
@@ -57,17 +59,25 @@ ombra_css = (
     else "box-shadow: none;"
 )
 
-# --- APPLICAZIONE STILI CSS DINAMICI ---
+# --- APPLICAZIONE STILI CSS DINAMICI E FORZATURA COLORI TESTO ---
 st.markdown(
     f"""
     <style>
     .main {{ background-color: #f8fafc; }}
     .stMetric {{
-        background-color: {st.session_state.sfondo_card};
+        background-color: {st.session_state.sfondo_card} !important;
         padding: 16px;
         border-radius: {st.session_state.bordo_riquadri}px;
         {ombra_css}
         border-left: 6px solid {colore_scelto};
+    }}
+    /* Forza il colore dei numeri e delle etichette nei riquadri KPI */
+    .stMetric [data-testid="stMetricValue"] {{
+        color: {st.session_state.colore_testo_card} !important;
+    }}
+    .stMetric [data-testid="stMetricLabel"] p, .stMetric label {{
+        color: {st.session_state.colore_testo_card} !important;
+        opacity: 0.85;
     }}
     </style>
 """,
@@ -114,7 +124,6 @@ def home_page():
     uscite_totali = df[df["Importo (€)"] < 0]["Importo (€)"].sum()
     bilancio_netto = entrate_totali + uscite_totali
 
-    # Blocco KPI configurabile
     if st.session_state.home_mostra_kpi:
       col1, col2, col3, col4 = st.columns(4)
       with col1:
@@ -131,7 +140,6 @@ def home_page():
         st.metric(label="📌 Voci Registrate", value=f"{len(df)} transazioni")
       st.markdown("---")
 
-    # Blocco Grafico configurabile
     if st.session_state.home_mostra_grafico:
       st.subheader("📊 Analisi Spese per Categoria")
       col_g1, col_g2 = st.columns([2, 1])
@@ -157,7 +165,6 @@ def home_page():
           st.success("Nessuna spesa registrata.")
       st.markdown("---")
 
-    # Blocco Top 5 Spese configurabile
     if st.session_state.home_mostra_top5:
       st.subheader("🚨 Top 5 Spese Più Rilevanti del Periodo")
       top_spese = df[df["Importo (€)"] < 0].nsmallest(5, "Importo (€)")
@@ -267,92 +274,4 @@ def personalizzazione_page():
     st.session_state.bordo_riquadri = st.slider(
         "Arrotondamento Riquadri / Card (Pixel)", 0, 30, st.session_state.bordo_riquadri
     )
-    st.session_state.ombra_box = st.checkbox(
-        "Attiva Effetto Ombra sui Riquadri", st.session_state.ombra_box
-    )
-    st.session_state.sfondo_card = st.color_picker(
-        "Colore Sfondo delle Card KPI", st.session_state.sfondo_card
-    )
-
-  with tab2:
-    st.subheader("Configurazione Contenuti Home")
-    st.session_state.home_titolo = st.text_input(
-        "Titolo Principale della Home", st.session_state.home_titolo
-    )
-    st.session_state.home_sottotitolo = st.text_area(
-        "Sottotitolo / Descrizione della Home",
-        st.session_state.home_sottotitolo,
-    )
-
-    st.markdown("#### Blocchi visibili in Home:")
-    st.session_state.home_mostra_kpi = st.checkbox(
-        "Mostra Riquadri KPI (Bilancio, Entrate, Uscite)",
-        st.session_state.home_mostra_kpi,
-    )
-    st.session_state.home_mostra_grafico = st.checkbox(
-        "Mostra Grafico Spese per Categoria",
-        st.session_state.home_mostra_grafico,
-    )
-    st.session_state.home_mostra_top5 = st.checkbox(
-        "Mostra Tabella Top 5 Spese Rilevanti",
-        st.session_state.home_mostra_top5,
-    )
-
-  with tab3:
-    st.subheader("Visibilità Pagine nel Menu Laterale")
-    st.session_state.mostra_home = st.checkbox(
-        "🏠 Mostra Home & Bilancio", st.session_state.mostra_home
-    )
-    st.session_state.mostra_analisi = st.checkbox(
-        "💰 Mostra Analisi & Filtri Spese", st.session_state.mostra_analisi
-    )
-    st.session_state.mostra_archivio = st.checkbox(
-        "📁 Mostra Archivio File", st.session_state.mostra_archivio
-    )
-    st.session_state.mostra_guide = st.checkbox(
-        "📚 Mostra Guide Lavoro", st.session_state.mostra_guide
-    )
-
-  st.markdown("---")
-  if st.button("💾 Salva e Aggiorna Dashboard"):
-    st.success("✅ Modifiche salvate e applicate con successo!")
-    st.rerun()
-
-
-# --- COSTRUZIONE DINAMICA DEL MENU ---
-pagine_attive = {}
-
-if st.session_state.mostra_home:
-  pagine_attive["Panoramica & KPI"] = [
-      st.Page(home_page, title="🏠 Home & Bilancio", default=True)
-  ]
-
-finanza_sub = []
-if st.session_state.mostra_analisi:
-  finanza_sub.append(
-      st.Page(analisi_avanzata_page, title="💰 Analisi & Filtri Spese")
-  )
-if finanza_sub:
-  pagine_attive["Gestione Finanziaria"] = finanza_sub
-
-lavoro_sub = []
-if st.session_state.mostra_archivio:
-  lavoro_sub.append(st.Page(archivio_file_page, title="📁 Archivio File"))
-if st.session_state.mostra_guide:
-  lavoro_sub.append(st.Page(guide_lavoro_page, title="📚 Guide Lavoro"))
-if lavoro_sub:
-  pagine_attive["Archivio & Lavoro"] = lavoro_sub
-
-pagine_attive["Impostazioni"] = [
-    st.Page(personalizzazione_page, title="🎨 Personalizza Layout")
-]
-
-if pagine_attive:
-  pg = st.navigation(pagine_attive)
-  pg.run()
-else:
-  st.warning(
-      "⚠️ Hai disattivato tutte le sezioni dal menu. Vai su 'Impostazioni' per"
-      " riattivarne almeno una."
-  )
-  st.Page(personalizzazione_page, title="🎨 Personalizza Layout").run()
+    st.session_state.ombra
