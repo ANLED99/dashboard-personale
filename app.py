@@ -1,4 +1,3 @@
-
 from datetime import datetime
 import os
 import pandas as pd
@@ -431,4 +430,181 @@ def spotify_page():
       sp = spotipy.Spotify(auth_manager=auth_manager)
       top_tracks = sp.current_user_top_tracks(limit=10, time_range="medium_term")
 
-      st.success("
+      st.success("Connessione a Spotify attiva con successo!")
+      brani_list = []
+      for idx, item in enumerate(top_tracks["items"], 1):
+        brani_list.append({
+            "Posizione": idx,
+            "Brano": item["name"],
+            "Artista": item["artists"][0]["name"],
+            "Album": item["album"]["name"],
+        })
+      st.dataframe(pd.DataFrame(brani_list), use_container_width=True)
+
+    except Exception as e:
+      st.info(
+          "Nota di autenticazione API: L'accesso live richiede l'apertura"
+          " del browser di autenticazione. Se utilizzi Streamlit Cloud, gestisci"
+          " i brani tramite il tab Storico Manuale o carica i file dal Centro"
+          f" Upload. (Dettaglio: {e})"
+      )
+
+  with tab_manuale:
+    st.subheader("Storico Inserito Manualmente")
+    with st.form("f_spot"):
+      c1, c2 = st.columns(2)
+      with c1:
+        ds = st.date_input("Data", datetime.today())
+        gen = st.text_input("Genere Principale")
+      with c2:
+        brani = st.number_input("Brani Ascoltati", 50)
+        art = st.text_input("Artista Top")
+
+      nota_spot = st.text_area("Note ascolti (o dettatura vocale):")
+
+      if st.form_submit_button("Registra Ascolti"):
+        s_new = pd.DataFrame([{
+            "Data": str(ds),
+            "Genere Principale": gen,
+            "Brani Ascoltati": brani,
+            "Artista Top": art,
+            "Nota": nota_spot,
+        }])
+        df_spotify = pd.concat([df_spotify, s_new], ignore_index=True)
+        salva_dati_modulo("spotify.csv", df_spotify)
+        st.success("Dati Spotify salvati!")
+        st.rerun()
+
+    if not df_spotify.empty:
+      df_spot_mod = st.data_editor(
+          df_spotify, num_rows="dynamic", use_container_width=True, key="edit_spot"
+      )
+      if st.button("💾 Salva Modifiche Storico"):
+        salva_dati_modulo("spotify.csv", df_spot_mod)
+        st.success("Storico aggiornato!")
+        st.rerun()
+
+
+def lavoro_page():
+  st.title("⚡ Lavoro & Workspace")
+  tab1, tab2 = st.tabs(["📚 Guide Software", "📝 Note Operative"])
+
+  with tab1:
+    soft = st.selectbox("Software", ["Bpoint", "Zucchetti Paghe", "AdE"])
+    st.text_area(f"Procedure operative per {soft}:", height=200)
+
+  with tab2:
+    st.session_state.note_lavoro = st.text_area(
+        "Blocco note libero (supporta dettatura vocale):",
+        value=st.session_state.note_lavoro,
+        height=250,
+    )
+
+
+def task_page():
+  st.title("✅ Attività & To-Do List")
+  nuovo = st.text_input("Nuova attività da completare:")
+  if st.button("Aggiungi Task"):
+    if nuovo:
+      st.session_state.todo_list.append(
+          {"Attività": nuovo, "Completata": False}
+      )
+      st.rerun()
+
+  for idx, task in enumerate(st.session_state.todo_list):
+    c1, c2 = st.columns([0.8, 0.2])
+    with c1:
+      comp = st.checkbox(
+          task["Attività"], value=task["Completata"], key=f"t_{idx}"
+      )
+      st.session_state.todo_list[idx]["Completata"] = comp
+    with c2:
+      if st.button("🗑️ Elimina", key=f"del_task_{idx}"):
+        st.session_state.todo_list.pop(idx)
+        st.rerun()
+
+
+def cultura_page():
+  st.title("📚 Cultura, Libri & Crescita")
+  global df_libri
+
+  with st.form("f_cultura"):
+    tit = st.text_input("Titolo Libro / Corso")
+    tip = st.selectbox("Tipologia", ["Libro", "Corso Online", "Podcast"])
+    stato = st.selectbox("Stato", ["Da Iniziare", "In Corso", "Completato"])
+    voto = st.slider("Valutazione", 1, 10, 8)
+
+    if st.form_submit_button("Aggiungi Elemento"):
+      c_new = pd.DataFrame([{
+          "Titolo": tit,
+          "Tipologia": tip,
+          "Stato": stato,
+          "Voto": voto,
+      }])
+      df_libri = pd.concat([df_libri, c_new], ignore_index=True)
+      salva_dati_modulo("libri.csv", df_libri)
+      st.success("Elemento aggiunto!")
+      st.rerun()
+
+  if not df_libri.empty:
+    st.subheader("Elenco Libreria (Modificabile o Eliminabile)")
+    df_lib_mod = st.data_editor(
+        df_libri, num_rows="dynamic", use_container_width=True, key="edit_lib"
+    )
+    if st.button("💾 Salva Modifiche Libreria"):
+      salva_dati_modulo("libri.csv", df_lib_mod)
+      st.success("Libreria aggiornata!")
+      st.rerun()
+
+
+def link_page():
+  st.title("🔑 Link Vault & Portali Rapidi")
+  global df_link
+
+  with st.form("f_link"):
+    nome = st.text_input("Nome Portale (es. Agenzia Entrate)")
+    url = st.text_input("URL / Link web")
+    note = st.text_input("Note o credenziali")
+    if st.button("Salva Link"):
+      l_new = pd.DataFrame([{"Nome Portale": nome, "URL": url, "Note": note}])
+      df_link = pd.concat([df_link, l_new], ignore_index=True)
+      salva_dati_modulo("link.csv", df_link)
+      st.success("Link salvato!")
+      st.rerun()
+
+  if not df_link.empty:
+    st.subheader("Portali Salvati (Modificabili o Eliminabili)")
+    df_link_mod = st.data_editor(
+        df_link, num_rows="dynamic", use_container_width=True, key="edit_link"
+    )
+    if st.button("💾 Salva Modifiche Link"):
+      salva_dati_modulo("link.csv", df_link_mod)
+      st.success("Link aggiornati!")
+      st.rerun()
+
+
+# --- STRUTTURA DI NAVIGAZIONE ORGANIZZATA CON CALENDARIO ---
+pg = st.navigation({
+    "Panoramica": [
+        st.Page(home_page, title="🏠 Home", default=True),
+        st.Page(calendario_page, title="📅 Calendario & Eventi"),
+    ],
+    "Gestione File & Upload": [
+        st.Page(centro_upload_page, title="📁 Centro Upload & Import")
+    ],
+    "Finanza & Patrimonio": [
+        st.Page(finanze_page, title="💰 Finanze & Abbonamenti")
+    ],
+    "Sport & Passioni": [
+        st.Page(sport_page, title="⚽ Calcio & Match"),
+        st.Page(spotify_page, title="🎧 Spotify & API Live"),
+    ],
+    "Lavoro & Utility": [
+        st.Page(lavoro_page, title="⚡ Lavoro & Workspace"),
+        st.Page(task_page, title="✅ Attività & To-Do"),
+        st.Page(cultura_page, title="📚 Cultura & Libri"),
+        st.Page(link_page, title="🔑 Link & Portali"),
+    ],
+})
+
+pg.run()
