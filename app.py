@@ -45,39 +45,16 @@ st.markdown(
 )
 
 
-# --- FUNZIONE GENERICA DI CARICAMENTO E SALVATAGGIO DEDICATO ---
-def gestisci_modulo_dati(nome_file, colonne_default):
-  """Gestisce in modo isolato e pulito il dataset di una specifica sezione."""
+# --- FUNZIONE DI CARICAMENTO E SALVATAGGIO DATI ISOLATI ---
+def carica_dati_modulo(nome_file, colonne_default):
   file_path = os.path.join(DATA_DIR, nome_file)
-
-  # Sezione Upload dedicata esclusivamente a questo modulo
-  with st.expander(f"📥 Importa file per {nome_file.split('.')[0].replace('_', ' ').capitalize()}"):
-    uploaded_file = st.file_uploader(
-        f"Seleziona file (CSV, Excel) per {nome_file}",
-        type=["csv", "xlsx", "xls"],
-        key=f"up_{nome_file}",
-    )
-    if uploaded_file is not None:
-      try:
-        if uploaded_file.name.endswith(".csv"):
-          df_up = pd.read_csv(uploaded_file)
-        else:
-          df_up = pd.read_excel(uploaded_file)
-
-        df_up.to_csv(file_path, index=False)
-        st.success(f"Dati di {nome_file} aggiornati con successo!")
-        return df_up
-      except Exception as e:
-        st.error(f"Errore nella lettura del file: {e}")
-
-  # Caricamento file esistente o creazione dataframe vuoto
   if os.path.exists(file_path):
     try:
       return pd.read_csv(file_path)
     except Exception:
       pass
 
-  # Fallback specifico per le finanze se esiste il file globale iniziale
+  # Fallback iniziale per le finanze
   if nome_file == "finanze.csv":
     try:
       df_init = pd.read_csv("movimenti_estratti_conto_2026.csv")
@@ -89,32 +66,35 @@ def gestisci_modulo_dati(nome_file, colonne_default):
   return pd.DataFrame(columns=colonne_default)
 
 
-# --- CARICAMENTO DATI ISOLATI PER CIASCUNA SEZIONE ---
-df_finanze = gestisci_modulo_dati(
+def salva_dati_modulo(nome_file, df):
+  file_path = os.path.join(DATA_DIR, nome_file)
+  df.to_csv(file_path, index=False)
+
+
+# --- CARICAMENTO DATASET ---
+df_finanze = carica_dati_modulo(
     "finanze.csv", ["Data", "Descrizione", "Importo (€)", "Categoria"]
 )
-df_abbonamenti = gestisci_modulo_dati(
+df_abbonamenti = carica_dati_modulo(
     "abbonamenti.csv", ["Servizio", "Costo (€)", "Frequenza", "Scadenza"]
 )
-df_partite = gestisci_modulo_dati(
+df_partite = carica_dati_modulo(
     "partite.csv",
     ["Data", "Avversario", "Competizione", "Risultato", "Gol Fatti", "Voto", "Nota"],
 )
-df_allenamenti = gestisci_modulo_dati(
+df_allenamenti = carica_dati_modulo(
     "allenamenti.csv", ["Data", "Tipo", "Durata (min)", "Nota"]
 )
-df_spotify = gestisci_modulo_dati(
+df_spotify = carica_dati_modulo(
     "spotify.csv",
     ["Data", "Genere Principale", "Brani Ascoltati", "Artista Top", "Nota"],
 )
-df_libri = gestisci_modulo_dati(
+df_libri = carica_dati_modulo(
     "libri.csv", ["Titolo", "Tipologia", "Stato", "Voto"]
 )
-df_link = gestisci_modulo_dati(
-    "link.csv", ["Nome Portale", "URL", "Note"]
-)
+df_link = carica_dati_modulo("link.csv", ["Nome Portale", "URL", "Note"])
 
-# Gestione in memoria di Task e Note se non presenti
+# Session state per To-Do List e Note
 if "todo_list" not in st.session_state:
   st.session_state.todo_list = [
       {"Attività": "Aggiornare estratti conto", "Completata": False},
@@ -126,8 +106,6 @@ if "note_lavoro" not in st.session_state:
 
 
 # --- DEFINIZIONE DELLE PAGINE DEL COMMAND CENTER ---
-
-
 def home_page():
   st.title("🌐 Google Command Center")
   st.markdown("Panoramica generale e stato di salute di tutti i tuoi moduli.")
@@ -154,35 +132,84 @@ def home_page():
 
   st.markdown("---")
   st.info(
-      "💡 Ogni area è indipendente: seleziona una sezione dal menu laterale per"
-      " gestire i dati specifici."
+      "💡 Usa la sezione **Centro Upload** nel menu per caricare file o le altre"
+      " sezioni per visualizzare, modificare ed eliminare i dati."
   )
+
+
+def centro_upload_page():
+  st.title("📁 Centro Upload & Importazione Universale")
+  st.markdown(
+      "Carica un file e seleziona a quale categoria di destinazione associarlo."
+  )
+  st.markdown("---")
+
+  # Mappa delle destinazioni con i rispettivi file di salvataggio
+  mappa_destinazioni = {
+      "Finanze / Estratto Conto (finanze.csv)": ("finanze.csv", ["Data", "Descrizione", "Importo (€)", "Categoria"]),
+      "Abbonamenti & Costi Fissi (abbonamenti.csv)": ("abbonamenti.csv", ["Servizio", "Costo (€)", "Frequenza", "Scadenza"]),
+      "Partite di Calcio (partite.csv)": ("partite.csv", ["Data", "Avversario", "Competizione", "Risultato", "Gol Fatti", "Voto", "Nota"]),
+      "Allenamenti (allenamenti.csv)": ("allenamenti.csv", ["Data", "Tipo", "Durata (min)", "Nota"]),
+      "Spotify & Ascolti (spotify.csv)": ("spotify.csv", ["Data", "Genere Principale", "Brani Ascoltati", "Artista Top", "Nota"]),
+      "Cultura & Libri (libri.csv)": ("libri.csv", ["Titolo", "Tipologia", "Stato", "Voto"]),
+      "Link & Portali (link.csv)": ("link.csv", ["Nome Portale", "URL", "Note"]),
+  }
+
+  scelta_categoria = st.selectbox(
+      "Seleziona la categoria di destinazione del file:",
+      list(mappa_destinazioni.keys()),
+  )
+
+  file_caricato = st.file_uploader(
+      "Seleziona il file da importare (CSV o Excel):", type=["csv", "xlsx", "xls"]
+  )
+
+  if file_caricato is not None:
+    if st.button("Conferma e Importa nei Dati"):
+      nome_file_target, colonne_def = mappa_destinazioni[scelta_categoria]
+      try:
+        if file_caricato.name.endswith(".csv"):
+          df_nuovo = pd.read_csv(file_caricato)
+        else:
+          df_nuovo = pd.read_excel(file_caricato)
+
+        # Legge il file esistente, unisce o sostituisce, e salva
+        df_esistente = carica_dati_modulo(nome_file_target, colonne_def)
+        df_finale = pd.concat([df_esistente, df_nuovo], ignore_index=True)
+        salva_dati_modulo(nome_file_target, df_finale)
+
+        st.success(
+            f"File importato con successo nella sezione '{scelta_categoria}'!"
+        )
+        st.rerun()
+      except Exception as e:
+        st.error(f"Errore durante l'elaborazione del file: {e}")
 
 
 def finanze_page():
   st.title("💰 Finanze & Abbonamenti")
   tab1, tab2 = st.tabs(["📊 Conto Corrente", "🔄 Costi Fissi & Abbonamenti"])
 
-  with tab1:
-    st.subheader("Movimenti Conto Corrente")
-    global df_finanze
-    # Upload specifico per le finanze
-    up_f = st.file_uploader("Carica file estratti conto (CSV/Excel)", type=["csv", "xlsx"], key="up_fin_file")
-    if up_f is not None:
-      df_new = pd.read_csv(up_f) if up_f.name.endswith(".csv") else pd.read_excel(up_f)
-      df_finanze = pd.concat([df_finanze, df_new], ignore_index=True)
-      df_finanze.to_csv(os.path.join(DATA_DIR, "finanze.csv"), index=False)
-      st.success("Estratto conto aggiunto con successo!")
-      st.rerun()
+  global df_finanze, df_abbonamenti
 
+  with tab1:
+    st.subheader("Movimenti Conto Corrente (Modificabili / Eliminabili)")
     if not df_finanze.empty:
-      st.dataframe(df_finanze, use_container_width=True)
+      # Tabella interattiva per modificare o eliminare righe al volo
+      df_finanze_modificato = st.data_editor(
+          df_finanze, num_rows="dynamic", use_container_width=True, key="edit_fin"
+      )
+      if st.button("💾 Salva Modifiche Conto"):
+        salva_dati_modulo("finanze.csv", df_finanze_modificato)
+        st.success("Modifiche salvate con successo!")
+        st.rerun()
+
       if "Importo (€)" in df_finanze.columns and "Categoria" in df_finanze.columns:
         df_uscite = df_finanze[df_finanze["Importo (€)"] < 0].copy()
         df_uscite["Assoluto"] = df_uscite["Importo (€)"].abs()
         st.bar_chart(df_uscite.groupby("Categoria")["Assoluto"].sum())
     else:
-      st.warning("Nessun movimento finanziario registrato.")
+      st.warning("Nessun movimento registrato. Usa il Centro Upload.")
 
   with tab2:
     st.subheader("Gestione Abbonamenti")
@@ -203,19 +230,26 @@ def finanze_page():
             "Frequenza": freq,
             "Scadenza": scad,
         }])
-        global df_abbonamenti
         df_abbonamenti = pd.concat([df_abbonamenti, nuovo_abb], ignore_index=True)
-        df_abbonamenti.to_csv(os.path.join(DATA_DIR, "abbonamenti.csv"), index=False)
-        st.success("Abbonamento salvato!")
+        salva_dati_modulo("abbonamenti.csv", df_abbonamenti)
+        st.success("Abbonamento aggiunto!")
         st.rerun()
 
     if not df_abbonamenti.empty:
-      st.dataframe(df_abbonamenti, use_container_width=True)
+      df_abb_mod = st.data_editor(
+          df_abbonamenti, num_rows="dynamic", use_container_width=True, key="edit_abb"
+      )
+      if st.button("💾 Salva Modifiche Abbonamenti"):
+        salva_dati_modulo("abbonamenti.csv", df_abb_mod)
+        st.success("Abbonamenti aggiornati!")
+        st.rerun()
 
 
 def sport_page():
   st.title("⚽ Sport & Calcio (Tuttocampo Style)")
   tab1, tab2 = st.tabs(["📋 Partite", "🏃‍♂️ Allenamenti"])
+
+  global df_partite, df_allenamenti
 
   with tab1:
     st.subheader("Registro Partite")
@@ -246,14 +280,20 @@ def sport_page():
             "Voto": voto,
             "Nota": nota,
         }])
-        global df_partite
         df_partite = pd.concat([df_partite, p_new], ignore_index=True)
-        df_partite.to_csv(os.path.join(DATA_DIR, "partite.csv"), index=False)
+        salva_dati_modulo("partite.csv", df_partite)
         st.success("Partita salvata!")
         st.rerun()
 
     if not df_partite.empty:
-      st.dataframe(df_partite, use_container_width=True)
+      st.subheader("Elenco Partite (Modificabili o Eliminabili)")
+      df_part_mod = st.data_editor(
+          df_partite, num_rows="dynamic", use_container_width=True, key="edit_part"
+      )
+      if st.button("💾 Salva Modifiche Partite"):
+        salva_dati_modulo("partite.csv", df_part_mod)
+        st.success("Partite aggiornate!")
+        st.rerun()
 
   with tab2:
     st.subheader("Registro Allenamenti")
@@ -271,18 +311,25 @@ def sport_page():
             "Durata (min)": dur,
             "Nota": nota_all,
         }])
-        global df_allenamenti
         df_allenamenti = pd.concat([df_allenamenti, a_new], ignore_index=True)
-        df_allenamenti.to_csv(os.path.join(DATA_DIR, "allenamenti.csv"), index=False)
+        salva_dati_modulo("allenamenti.csv", df_allenamenti)
         st.success("Allenamento salvato!")
         st.rerun()
 
     if not df_allenamenti.empty:
-      st.dataframe(df_allenamenti, use_container_width=True)
+      df_all_mod = st.data_editor(
+          df_allenamenti, num_rows="dynamic", use_container_width=True, key="edit_all"
+      )
+      if st.button("💾 Salva Modifiche Allenamenti"):
+        salva_dati_modulo("allenamenti.csv", df_all_mod)
+        st.success("Allenamenti aggiornati!")
+        st.rerun()
 
 
 def spotify_page():
   st.title("🎧 Spotify & Monitoraggio Ascolti")
+  global df_spotify
+
   with st.form("f_spot"):
     c1, c2 = st.columns(2)
     with c1:
@@ -302,104 +349,7 @@ def spotify_page():
           "Artista Top": art,
           "Nota": nota_spot,
       }])
-      global df_spotify
       df_spotify = pd.concat([df_spotify, s_new], ignore_index=True)
-      df_spotify.to_csv(os.path.join(DATA_DIR, "spotify.csv"), index=False)
+      salva_dati_modulo("spotify.csv", df_spotify)
       st.success("Dati Spotify salvati!")
-      st.rerun()
-
-  if not df_spotify.empty:
-    st.dataframe(df_spotify, use_container_width=True)
-    if "Genere Principale" in df_spotify.columns and "Brani Ascoltati" in df_spotify.columns:
-      st.bar_chart(df_spotify.groupby("Genere Principale")["Brani Ascoltati"].sum())
-
-
-def lavoro_page():
-  st.title("⚡ Lavoro & Workspace")
-  tab1, tab2 = st.tabs(["📚 Guide Software", "📝 Note Operative"])
-
-  with tab1:
-    soft = st.selectbox("Software", ["Bpoint", "Zucchetti Paghe", "AdE"])
-    st.text_area(f"Procedure operative per {soft}:", height=200)
-
-  with tab2:
-    st.session_state.note_lavoro = st.text_area(
-        "Blocco note libero (supporta dettatura vocale):",
-        value=st.session_state.note_lavoro,
-        height=250,
-    )
-
-
-def task_page():
-  st.title("✅ Attività & To-Do List")
-  nuovo = st.text_input("Nuova attività da completare:")
-  if st.button("Aggiungi Task"):
-    if nuovo:
-      st.session_state.todo_list.append({"Attività": nuovo, "Completata": False})
-      st.rerun()
-
-  for idx, task in enumerate(st.session_state.todo_list):
-    comp = st.checkbox(task["Attività"], value=task["Completata"], key=f"t_{idx}")
-    st.session_state.todo_list[idx]["Completata"] = comp
-
-
-def cultura_page():
-  st.title("📚 Cultura, Libri & Crescita")
-  with st.form("f_cultura"):
-    tit = st.text_input("Titolo Libro / Corso")
-    tip = st.selectbox("Tipologia", ["Libro", "Corso Online", "Podcast"])
-    stato = st.selectbox("Stato", ["Da Iniziare", "In Corso", "Completato"])
-    voto = st.slider("Valutazione", 1, 10, 8)
-
-    if st.form_submit_button("Aggiungi Elemento"):
-      c_new = pd.DataFrame([{
-          "Titolo": tit,
-          "Tipologia": tip,
-          "Stato": stato,
-          "Voto": voto,
-      }])
-      global df_libri
-      df_libri = pd.concat([df_libri, c_new], ignore_index=True)
-      df_libri.to_csv(os.path.join(DATA_DIR, "libri.csv"), index=False)
-      st.success("Elemento aggiunto!")
-      st.rerun()
-
-  if not df_libri.empty:
-    st.dataframe(df_libri, use_container_width=True)
-
-
-def link_page():
-  st.title("🔑 Link Vault & Portali Rapidi")
-  with st.form("f_link"):
-    nome = st.text_input("Nome Portale (es. Agenzia Entrate)")
-    url = st.text_input("URL / Link web")
-    note = st.text_input("Note o credenziali")
-    if st.form_submit_button("Salva Link"):
-      l_new = pd.DataFrame([{"Nome Portale": nome, "URL": url, "Note": note}])
-      global df_link
-      df_link = pd.concat([df_link, l_new], ignore_index=True)
-      df_link.to_csv(os.path.join(DATA_DIR, "link.csv"), index=False)
-      st.success("Link salvato!")
-      st.rerun()
-
-  if not df_link.empty:
-    st.dataframe(df_link, use_container_width=True)
-
-
-# --- STRUTTURA DI NAVIGAZIONE ORGANIZZATA ---
-pg = st.navigation({
-    "Panoramica": [st.Page(home_page, title="🏠 Home", default=True)],
-    "Finanza & Patrimonio": [st.Page(finanze_page, title="💰 Finanze & Abbonamenti")],
-    "Sport & Passioni": [
-        st.Page(sport_page, title="⚽ Calcio & Match"),
-        st.Page(spotify_page, title="🎧 Spotify & Musica"),
-    ],
-    "Lavoro & Utility": [
-        st.Page(lavoro_page, title="⚡ Lavoro & Workspace"),
-        st.Page(task_page, title="✅ Attività & To-Do"),
-        st.Page(cultura_page, title="📚 Cultura & Libri"),
-        st.Page(link_page, title="🔑 Link & Portali"),
-    ],
-})
-
-pg.run()
+      st.rer
