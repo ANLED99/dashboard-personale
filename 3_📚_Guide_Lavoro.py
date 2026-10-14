@@ -1,4 +1,7 @@
-import streamlit as st
+# --- BARRA LATERALE COMUNE ---
+st.sidebar.title("⚡ Centro di Controllo")
+st.sidebar.markdown("---")
+st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")import streamlit as st
 
 st.set_page_config(
     page_title="Guide Lavoro", page_icon="📚", layout="wide"
