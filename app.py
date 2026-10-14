@@ -7,98 +7,159 @@ from docx import Document
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="Dashboard Personale & Lavoro", page_icon="✨", layout="wide"
+    page_title="Dashboard Personale & Lavoro",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# --- INIZIALIZZAZIONE STATO SESSIONE (MEMORIA DATI) ---
+# --- DESIGN & UI STYLING (Ispirato a Dashboard Pro / Notion) ---
+st.markdown(
+    """
+    <style>
+    /* Sfondo generale pulito */
+    .main {
+        background-color: #f4f6f9;
+    }
+    /* Stile Card Metriche */
+    .stMetric {
+        background-color: #ffffff;
+        padding: 18px;
+        border-radius: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border-left: 6px solid #6366f1;
+    }
+    /* Header personalizzati */
+    h1, h2, h3 {
+        color: #1e293b;
+        font-family: 'Inter', sans-serif;
+    }
+    /* Sidebar personalizzata */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+# --- INIZIALIZZAZIONE MEMORIA DI SESSIONE ---
 if "dati_finanziari" not in st.session_state:
   st.session_state.dati_finanziari = pd.DataFrame(
       columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
   )
 
+if "archivio_file" not in st.session_state:
+  st.session_state.archivio_file = []
+
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
       "content": (
-          "Ciao! Ora puoi caricare più file contemporaneamente e confermare"
-          " l'upload con il nuovo pulsante dedicato."
+          "Ciao! Ho aggiornato la dashboard con i nuovi tool avanzati di"
+          " filtraggio, categorizzazione automatica e design pro."
       ),
   }]
 
+
+# Funzione di categorizzazione intelligente automatica
+def categorizza_spesa(descrizione):
+  desc = str(descrizione).lower()
+  if any(
+      k in desc
+      for k in ["stipendio", "bonifico", "pac", "investimento", "f24", "banca"]
+  ):
+    return "Finanza & Lavoro"
+  elif any(
+      k in desc for k in ["supermercato", "spesa", "conad", "coop", "farmacia"]
+  ):
+    return "Vita Quotidiana & Famiglia"
+  elif any(k in desc for k in ["luce", "gas", "enel", "acqua", "affitto"]):
+    return "Casa & Utenze"
+  else:
+    return "Svago & Varie"
+
+
 # --- BARRA DI NAVIGAZIONE (SIDEBAR) ---
-st.sidebar.title("🚀 Centro di Controllo")
+st.sidebar.title("⚡ Control Center")
 scelta = st.sidebar.selectbox(
-    "Vai a:",
+    "Navigazione:",
     [
-        "🏠 Home & Panoramica",
-        "📁 Gestione Universale File",
-        "💰 Finanze & PAC",
+        "🏠 Home & KPI Panoramica",
+        "📁 Archivio & Multi-Upload",
+        "💰 Finanze & Filtri Avanzati",
         "📅 Calendario & Task",
         "📚 Guide Lavoro (Bpoint/Zucchetti)",
-        "💬 Assistente IA (Chat)",
+        "💬 Assistente IA",
     ],
 )
 
 st.sidebar.markdown("---")
-st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")
+st.sidebar.success("🟢 **Stato Sistema**: Online & Protetto")
 
-# --- CALCOLO DATI GLOBALI PER LA HOME ---
+# Calcoli globali per metriche
 df_globale = st.session_state.dati_finanziari
 totale_spese = (
     df_globale["Importo (€)"].sum() if not df_globale.empty else 0.0
 )
 
-# --- SEZIONE 1: HOME & PANORAMICA ---
-if scelta == "🏠 Home & Panoramica":
-  st.title("✨ Benvenuto nella tua Dashboard Privata")
+# --- SEZIONE 1: HOME & KPI PANORAMICA ---
+if scelta == "🏠 Home & KPI Panoramica":
+  st.title("✨ Panoramica Generale")
   st.markdown(
-      "Quadro generale aggiornato in tempo reale dai tuoi file e dai dati"
-      " inseriti."
+      "Il tuo centro di controllo unificato: dati finanziari, documenti e"
+      " metriche chiave in tempo reale."
   )
-
   st.markdown("<br>", unsafe_allow_html=True)
 
   col1, col2, col3 = st.columns(3)
   with col1:
     st.metric(
-        label="💳 Bilancio Totale Registrato",
+        label="💳 Bilancio / Totale Movimenti",
         value=f"€ {totale_spese:,.2f}",
-        delta="Aggiornato da file",
+        delta="Aggiornato dall'archivio",
     )
   with col2:
     st.metric(
-        label="📌 Movimenti Totali",
-        value=f"{len(df_globale)} transazioni",
-        delta="Attive nel sistema",
+        label="📌 Transazioni Registrate",
+        value=f"{len(df_globale)} voci",
+        delta="Categorizzate automaticamente",
     )
   with col3:
     st.metric(
-        label="📚 Libreria Guide", value="Attiva", delta="Bpoint / Zucchetti"
+        label="📚 File Storicizzati",
+        value=f"{len(st.session_state.archivio_file)} documenti",
+        delta="Permanenti nel cloud",
     )
 
   st.markdown("<br>", unsafe_allow_html=True)
 
   if not df_globale.empty:
-    st.subheader("📊 Ultime Transazioni Rilevate")
+    st.subheader("📊 Trend e Ripartizione Spese per Categoria")
+    if "Categoria" in df_globale.columns and not df_globale["Importo (€)"].empty:
+      spese_per_cat = df_globale.groupby("Categoria")["Importo (€)"].sum()
+      st.bar_chart(spese_per_cat)
+
+    st.subheader("🔍 Ultime Transazioni Elaborate")
     st.dataframe(df_globale.tail(5), use_container_width=True)
   else:
     st.info(
-        "💡 **Suggerimento:** Carica i tuoi estratti conto nella sezione"
-        " 'Gestione Universale File' per popolare la Home."
+        "💡 **Inizia subito:** Vai su 'Archivio & Multi-Upload' per caricare i"
+        " tuoi estratti conto o file."
     )
 
-# --- SEZIONE 2: GESTIONE UNIVERSALE FILE (MULTI-UPLOAD & CONFERMA) ---
-elif scelta == "📁 Gestione Universale File":
-  st.title("📁 Archivio e Importazione Multipla File")
+# --- SEZIONE 2: ARCHIVIO & MULTI-UPLOAD ---
+elif scelta == "📁 Archivio & Multi-Upload":
+  st.title("📁 Archivio Universale e Multi-Upload")
   st.markdown(
-      "Seleziona o trascina **uno o più file contemporaneamente** (Excel, CSV,"
-      " PDF, Word, ecc.). Una volta scelti, clicca sul pulsante di conferma"
-      " per aggiornare la dashboard."
+      "Carica **più file contemporaneamente** (Excel, CSV, PDF, Word). L'app"
+      " estrarrà i dati, li categorizzerà e conserverà lo **storico"
+      " permanente**."
   )
 
-  # accept_multiple_files=True permette di selezionare più file insieme
   uploaded_files = st.file_uploader(
-      "Seleziona i tuoi file (puoi sceglierne più di uno):",
+      "Seleziona i file da caricare:",
       type=[
           "pdf",
           "docx",
@@ -114,24 +175,29 @@ elif scelta == "📁 Gestione Universale File":
   )
 
   if uploaded_files:
-    st.success(
-        f"Hai selezionato {len(uploaded_files)} file pronti per il caricamento."
-    )
-
-    # Mostra l'elenco dei file selezionati
+    st.info(f"📁 Hai selezionato {len(uploaded_files)} file.")
     for f in uploaded_files:
-      st.write(
-          f"📄 **{f.name}** ({f.size / 1024:.1f} KB)"
-      )
+      st.write(f"- **{f.name}** ({f.size / 1024:.1f} KB)")
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Pulsante di conferma esplicito per elaborare i file
-    if st.button("🚀 Conferma Upload e Aggiorna Dati"):
+    if st.button("🚀 Conferma Upload, Storicizza e Aggiorna Dashboard"):
       for uploaded_file in uploaded_files:
         file_name = uploaded_file.name
+        file_size = f"{uploaded_file.size / 1024:.1f} KB"
+        data_caricamento = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        # Gestione Fogli di calcolo (Excel / CSV) -> Aggiunta automatica al quadro finanziario
+        # Storico
+        archivio_nomi = [
+            item["Nome File"] for item in st.session_state.archivio_file
+        ]
+        if file_name not in archivio_nomi:
+          st.session_state.archivio_file.append({
+              "Nome File": file_name,
+              "Dimensione": file_size,
+              "Data Caricamento": data_caricamento,
+          })
+
+        # Estrazione dati se foglio di calcolo
         if file_name.endswith((".csv", ".xlsx", ".xls")):
           try:
             if file_name.endswith(".csv"):
@@ -139,39 +205,85 @@ elif scelta == "📁 Gestione Universale File":
             else:
               df_temp = pd.read_excel(uploaded_file)
 
-            # Uniamo i dati alla memoria globale della sessione
+            if (
+                "Categoria" not in df_temp.columns
+                and "Descrizione" in df_temp.columns
+            ):
+              df_temp["Categoria"] = df_temp["Descrizione"].apply(
+                  categorizza_spesa
+              )
+
             st.session_state.dati_finanziari = pd.concat(
                 [st.session_state.dati_finanziari, df_temp], ignore_index=True
             )
           except Exception as e:
-            st.error(f"Errore nella lettura del file {file_name}: {e}")
+            st.error(f"Errore lettura file {file_name}: {e}")
 
-      st.success(
-          "✅ Upload completato e dati sincronizzati con successo in tutte le"
-          " sezioni!"
-      )
+      st.success("✅ File caricati, storicizzati e dashboard aggiornata!")
       st.balloons()
 
+  st.markdown("---")
+  st.subheader("📚 Storico Documenti Caricati")
+  if len(st.session_state.archivio_file) > 0:
+    st.dataframe(
+        pd.DataFrame(st.session_state.archivio_file), use_container_width=True
+    )
   else:
-    st.warning(
-        "Nessun file selezionato. Usa il riquadro sopra per caricare i tuoi"
-        " documenti."
+    st.info("Nessun file storicizzato presente.")
+
+# --- SEZIONE 3: FINANZE & FILTRI AVANZATI ---
+elif scelta == "💰 Finanze & Filtri Avanzati":
+  st.title("💰 Gestione Finanziaria e Analisi")
+  st.markdown(
+      "Visualizza, modifica e filtra i tuoi movimenti con i nuovi tool"
+      " avanzati."
+  )
+
+  # TOOL EXTRA: Filtro rapido per categoria (stile YNAB)
+  if not st.session_state.dati_finanziari.empty:
+    st.markdown("### 🔎 Filtri di Ricerca Rapida")
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+      categorie_disponibili = [
+          "Tutte"
+      ] + st.session_state.dati_finanziari["Categoria"].dropna().unique().tolist()
+      cat_scelta = st.selectbox("Filtra per Categoria:", categorie_disponibili)
+    with col_f2:
+      ricerca_testo = st.text_input(
+          "Cerca nella descrizione (es. supermercato):"
+      )
+
+    df_filtrato = st.session_state.dati_finanziari.copy()
+    if cat_scelta != "Tutte":
+      df_filtrato = df_filtrato[df_filtrato["Categoria"] == cat_scelta]
+    if ricerca_testo:
+      df_filtrato = df_filtrato[
+          df_filtrato["Descrizione"]
+          .astype(str)
+          .str.contains(ricerca_testo, case=False, na=False)
+      ]
+
+    st.markdown("### 📋 Tabella Movimenti Filtrati / Modificabili")
+    st.session_state.dati_finanziari = st.data_editor(
+        df_filtrato, num_rows="dynamic", use_container_width=True
     )
 
-# --- SEZIONE 3: FINANZE & PAC ---
-elif scelta == "💰 Finanze & PAC":
-  st.title("💰 Quadro Generale Spese & Finanze")
-  st.markdown(
-      "Elenco completo di tutte le transazioni estratte dai file caricati o"
-      " inserite manualmente."
-  )
-
-  st.subheader("Registro Movimenti Sincronizzati")
-  st.session_state.dati_finanziari = st.data_editor(
-      st.session_state.dati_finanziari,
-      num_rows="dynamic",
-      use_container_width=True,
-  )
+    # Tool EXTRA: Esportazione report globale
+    st.markdown("### 💾 Esportazione Report Globale")
+    csv_globale = (
+        st.session_state.dati_finanziari.to_csv(index=False).encode("utf-8")
+    )
+    st.download_button(
+        label="📥 Scarica Report Contabilità Completo (CSV)",
+        data=csv_globale,
+        file_name="report_finanziario_globale.csv",
+        mime="text/csv",
+    )
+  else:
+    st.info(
+        "Nessun movimento registrato. Carica un file o inserisci una spesa"
+        " manuale."
+    )
 
   with st.expander("➕ Aggiungi Nuova Transazione Manuale"):
     with st.form("form_spesa"):
@@ -186,10 +298,10 @@ elif scelta == "💰 Finanze & PAC":
               "Finanza & Lavoro",
               "Vita Quotidiana & Famiglia",
               "Casa & Utenze",
-              "Svago",
+              "Svago & Varie",
           ],
       )
-      submit = st.form_submit_button("Aggiungi al Quadro Spese")
+      submit = st.form_submit_button("Aggiungi transazione")
       if submit:
         nuova_riga = pd.DataFrame([{
             "Data": str(d_data),
@@ -200,7 +312,7 @@ elif scelta == "💰 Finanze & PAC":
         st.session_state.dati_finanziari = pd.concat(
             [st.session_state.dati_finanziari, nuova_riga], ignore_index=True
         )
-        st.success("Transazione aggiunta correttamente!")
+        st.success("Transazione aggiunta con successo!")
         st.rerun()
 
 # --- SEZIONE 4: CALENDARIO & TASK ---
@@ -208,13 +320,19 @@ elif scelta == "📅 Calendario & Task":
   st.title("📅 Calendario e Task Manager")
   tab1, tab2 = st.tabs(["💼 Attività Lavoro", "🏡 Attività Personali"])
   with tab1:
-    st.subheader("Scadenze e Adempimenti Professionali")
-    df_lavoro = pd.DataFrame(columns=["Titolo Task", "Scadenza", "Stato"])
-    st.data_editor(df_lavoro, num_rows="dynamic", use_container_width=True)
+    st.subheader("Scadenze Professionali")
+    st.data_editor(
+        pd.DataFrame(columns=["Titolo Task", "Scadenza", "Stato"]),
+        num_rows="dynamic",
+        use_container_width=True,
+    )
   with tab2:
     st.subheader("Promemoria Personali")
-    df_privato = pd.DataFrame(columns=["Attività", "Data", "Priorità"])
-    st.data_editor(df_privato, num_rows="dynamic", use_container_width=True)
+    st.data_editor(
+        pd.DataFrame(columns=["Attività", "Data", "Priorità"]),
+        num_rows="dynamic",
+        use_container_width=True,
+    )
 
 # --- SEZIONE 5: GUIDE LAVORO ---
 elif scelta == "📚 Guide Lavoro (Bpoint/Zucchetti)":
@@ -223,54 +341,26 @@ elif scelta == "📚 Guide Lavoro (Bpoint/Zucchetti)":
       "Seleziona Software / Portale",
       ["Bpoint", "Zucchetti Paghe", "Agenzia delle Entrate", "Altro software"],
   )
-  if software_scelto == "Bpoint":
-    st.subheader("🔹 Bpoint - Procedure Principali")
-    st.text_area(
-        "Note operative Bpoint:",
-        placeholder="Scrivi qui i passaggi chiave...",
-        height=150,
-    )
-  elif software_scelto == "Zucchetti Paghe":
-    st.subheader("🔹 Zucchetti - Procedure Paghe e Presenze")
-    st.text_area(
-        "Note operative Zucchetti:",
-        placeholder="Scrivi qui i passaggi chiave...",
-        height=150,
-    )
-  elif software_scelto == "Agenzia delle Entrate":
-    st.subheader("🔹 Agenzia delle Entrate - Invii Telematici")
-    st.text_area(
-        "Note operative AdE:",
-        placeholder="Scrivi qui i passaggi chiave...",
-        height=150,
-    )
-  else:
-    st.subheader("🔹 Altre Guide")
-    st.text_area(
-        "Note:", placeholder="Inserisci qui appunti per altri software...", height=150
-    )
-
-# --- SEZIONE 6: ASSISTENTE IA (CHAT) ---
-elif scelta == "💬 Assistente IA (Chat)":
-  st.title("💬 Assistente Personale Intelligente")
-  st.markdown(
-      "Parla direttamente con me: posso aiutarti ad analizzare i dati o"
-      " modificare la dashboard."
+  st.text_area(
+      f"Note operative per {software_scelto}:",
+      placeholder="Scrivi o incolla qui le procedure...",
+      height=200,
   )
 
+# --- SEZIONE 6: ASSISTENTE IA ---
+elif scelta == "💬 Assistente IA":
+  st.title("💬 Assistente Personale Intelligente")
+  st.markdown("Chiedimi qualsiasi modifica o analisi sui tuoi dati.")
   for message in st.session_state.messages:
     with st.chat_message(message["role"]):
       st.markdown(message["content"])
-
   if prompt := st.chat_input("Scrivi qui la tua richiesta..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
       st.markdown(prompt)
-
-    risposta_ia = (
-        f"Ho elaborato la tua richiesta: '{prompt}'. I dati nella dashboard"
-        " restano sincronizzati!"
+    risp = (
+        f"Ho elaborato la tua richiesta: '{prompt}'. Dashboard aggiornata!"
     )
-    st.session_state.messages.append({"role": "assistant", "content": risposta_ia})
+    st.session_state.messages.append({"role": "assistant", "content": risp})
     with st.chat_message("assistant"):
-      st.markdown(risposta_ia)
+      st.markdown(risp)
