@@ -1,4 +1,7 @@
-
+# --- BARRA LATERALE COMUNE ---
+st.sidebar.title("⚡ Centro di Controllo")
+st.sidebar.markdown("---")
+st.sidebar.success("🟢 **Stato Sistema**: Online & Sincronizzato")
 import pandas as pd
 import streamlit as st
 
