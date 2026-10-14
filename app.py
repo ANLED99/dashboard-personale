@@ -27,9 +27,20 @@ st.markdown(
 # --- INIZIALIZZAZIONE MEMORIA E CARICAMENTO CSV AUTOMATICO ---
 if "dati_finanziari" not in st.session_state:
   try:
-    st.session_state.dati_finanziari = pd.read_csv(
-        "movimenti_estratti_conto_2026.csv"
-    )
+    df_load = pd.read_csv("movimenti_estratti_conto_2026.csv")
+    # Pulizia robusta della colonna importi per evitare errori di tipo
+    if "Importo (€)" in df_load.columns:
+      df_load["Importo (€)"] = (
+          df_load["Importo (€)"]
+          .astype(str)
+          .str.replace("€", "", regex=False)
+          .str.replace(" ", "", regex=False)
+          .str.replace(",", ".", regex=False)
+      )
+      df_load["Importo (€)"] = pd.to_numeric(
+          df_load["Importo (€)"], errors="coerce"
+      )
+    st.session_state.dati_finanziari = df_load
   except Exception:
     st.session_state.dati_finanziari = pd.DataFrame(
         columns=["Data", "Descrizione", "Importo (€)", "Categoria"]
@@ -51,6 +62,9 @@ def home_page():
   df = st.session_state.dati_finanziari
 
   if not df.empty:
+    # Assicuriamoci che gli importi siano numerici
+    df["Importo (€)"] = pd.to_numeric(df["Importo (€)"], errors="coerce")
+
     # Calcoli KPI avanzati
     entrate_totali = df[df["Importo (€)"] > 0]["Importo (€)"].sum()
     uscite_totali = df[df["Importo (€)"] < 0]["Importo (€)"].sum()
@@ -77,7 +91,6 @@ def home_page():
     col_g1, col_g2 = st.columns([2, 1])
 
     with col_g1:
-      # Filtriamo solo le uscite per analizzare dove si spende di più
       df_uscite = df[df["Importo (€)"] < 0].copy()
       df_uscite["Importo Assoluto"] = df_uscite["Importo (€)"].abs()
       spese_per_cat = df_uscite.groupby("Categoria")[
@@ -124,6 +137,7 @@ def analisi_avanzata_page():
   df = st.session_state.dati_finanziari
 
   if not df.empty:
+    df["Importo (€)"] = pd.to_numeric(df["Importo (€)"], errors="coerce")
     col_f1, col_f2 = st.columns(2)
     with col_f1:
       cat_list = ["Tutte"] + df["Categoria"].dropna().unique().tolist()
@@ -145,12 +159,10 @@ def analisi_avanzata_page():
 
     st.markdown(f"Trovate **{len(df_filtrato)}** transazioni corrispondenti:")
 
-    # Tabella modificabile per ricategorizzare al volo
     st.session_state.dati_finanziari = st.data_editor(
         df_filtrato, num_rows="dynamic", use_container_width=True
     )
 
-    # Tool di Download Report Filtrato
     csv_data = df_filtrato.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="📥 Scarica Report Filtrato in CSV",
