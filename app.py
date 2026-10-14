@@ -1,3 +1,4 @@
+
 from datetime import datetime
 import os
 import pandas as pd
@@ -8,12 +9,12 @@ st.set_page_config(
     page_title="Google Command Center", page_icon="🌐", layout="wide"
 )
 
-# --- CREAZIONE CARTELLA DATI PER STORICIZZAZIONE ---
+# --- CREAZIONE CARTELLA DATI PER LA PERSISTENZA ---
 DATA_DIR = "data"
 if not os.path.exists(DATA_DIR):
   os.makedirs(DATA_DIR)
 
-# --- STILE GRAFICO GOOGLE STYLE ---
+# --- STILE GRAFICO GOOGLE MATERIAL DESIGN ---
 st.markdown(
     """
     <style>
@@ -45,99 +46,97 @@ st.markdown(
 )
 
 
-# --- UTILITY DI UPLOAD E STORICIZZAZIONE PERMANENTE ---
-def gestisci_upload_persistente(nome_file_salvataggio, colonne_default):
-  file_path = os.path.join(DATA_DIR, nome_file_salvataggio)
+# --- FUNZIONE GENERICA DI CARICAMENTO E SALVATAGGIO DEDICATO ---
+def gestisci_modulo_dati(nome_file, colonne_default):
+  """Gestisce in modo isolato e pulito il dataset di una specifica sezione."""
+  file_path = os.path.join(DATA_DIR, nome_file)
 
-  uploaded_file = st.file_uploader(
-      f"📁 Carica/Aggiorna ({nome_file_salvataggio}):",
-      type=["csv", "xlsx", "json"],
-      key=f"up_{nome_file_salvataggio}",
-  )
+  # Sezione Upload dedicata esclusivamente a questo modulo
+  with st.expander(f"📥 Importa file per {nome_file.split('.')[0].replace('_', ' ').capitalize()}"):
+    uploaded_file = st.file_uploader(
+        f"Seleziona file (CSV, Excel) per {nome_file}",
+        type=["csv", "xlsx", "xls"],
+        key=f"up_{nome_file}",
+    )
+    if uploaded_file is not None:
+      try:
+        if uploaded_file.name.endswith(".csv"):
+          df_up = pd.read_csv(uploaded_file)
+        else:
+          df_up = pd.read_excel(uploaded_file)
 
-  if uploaded_file is not None:
-    try:
-      if uploaded_file.name.endswith(".csv"):
-        df_new = pd.read_csv(uploaded_file)
-      elif uploaded_file.name.endswith((".xls", ".xlsx")):
-        df_new = pd.read_excel(uploaded_file)
-      else:
-        df_new = pd.read_json(uploaded_file)
+        df_up.to_csv(file_path, index=False)
+        st.success(f"Dati di {nome_file} aggiornati con successo!")
+        return df_up
+      except Exception as e:
+        st.error(f"Errore nella lettura del file: {e}")
 
-      df_new.to_csv(file_path, index=False)
-      st.success(
-          f"File '{nome_file_salvataggio}' aggiornato e salvato permanentemente!"
-      )
-      return df_new
-    except Exception as e:
-      st.error(f"Errore caricamento: {e}")
-
+  # Caricamento file esistente o creazione dataframe vuoto
   if os.path.exists(file_path):
     try:
       return pd.read_csv(file_path)
     except Exception:
       pass
 
+  # Fallback specifico per le finanze se esiste il file globale iniziale
+  if nome_file == "finanze.csv":
+    try:
+      df_init = pd.read_csv("movimenti_estratti_conto_2026.csv")
+      df_init.to_csv(file_path, index=False)
+      return df_init
+    except Exception:
+      pass
+
   return pd.DataFrame(columns=colonne_default)
 
 
-# --- CARICAMENTO DATI PERSISTENTI ---
-df_finanze = gestisci_upload_persistente(
-    "movimenti_finanziari.csv", ["Data", "Descrizione", "Importo (€)", "Categoria"]
+# --- CARICAMENTO DATI ISOLATI PER CIASCUNA SEZIONE ---
+df_finanze = gestisci_modulo_dati(
+    "finanze.csv", ["Data", "Descrizione", "Importo (€)", "Categoria"]
 )
-if df_finanze.empty:
-  try:
-    df_finanze = pd.read_csv("movimenti_estratti_conto_2026.csv")
-  except Exception:
-    pass
-
-df_abbonamenti = gestisci_upload_persistente(
+df_abbonamenti = gestisci_modulo_dati(
     "abbonamenti.csv", ["Servizio", "Costo (€)", "Frequenza", "Scadenza"]
 )
-df_partite = gestisci_upload_persistente(
-    "partite_calcio.csv",
+df_partite = gestisci_modulo_dati(
+    "partite.csv",
     ["Data", "Avversario", "Competizione", "Risultato", "Gol Fatti", "Voto", "Nota"],
 )
-df_allenamenti = gestisci_upload_persistente(
-    "allenamenti_calcio.csv", ["Data", "Tipo", "Durata (min)", "Note"]
+df_allenamenti = gestisci_modulo_dati(
+    "allenamenti.csv", ["Data", "Tipo", "Durata (min)", "Nota"]
 )
-df_spotify = gestisci_upload_persistente(
-    "spotify_ascolti.csv",
+df_spotify = gestisci_modulo_dati(
+    "spotify.csv",
     ["Data", "Genere Principale", "Brani Ascoltati", "Artista Top", "Nota"],
 )
-df_libri = gestisci_upload_persistente(
-    "libri_corsi.csv", ["Titolo", "Tipologia", "Stato", "Voto / Valutazione"]
+df_libri = gestisci_modulo_dati(
+    "libri.csv", ["Titolo", "Tipologia", "Stato", "Voto"]
 )
-df_link = gestisci_upload_persistente(
-    "link_utili.csv", ["Nome Portale", "URL", "Note / Credenziali"]
+df_link = gestisci_modulo_dati(
+    "link.csv", ["Nome Portale", "URL", "Note"]
 )
 
-
-# Inizializzazioni in memoria per task e note se non presenti
+# Gestione in memoria di Task e Note se non presenti
 if "todo_list" not in st.session_state:
   st.session_state.todo_list = [
       {"Attività": "Aggiornare estratti conto", "Completata": False},
       {"Attività": "Preparare report Bpoint", "Completata": True},
   ]
 
-if "archivio_file" not in st.session_state:
-  st.session_state.archivio_file = []
-
-if "note_personali" not in st.session_state:
-  st.session_state.note_personali = "Note rapide del workspace..."
+if "note_lavoro" not in st.session_state:
+  st.session_state.note_lavoro = "Appunti e note operative di lavoro..."
 
 
-# --- FUNZIONI DELLE SEZIONI ---
+# --- DEFINIZIONE DELLE PAGINE DEL COMMAND CENTER ---
+
+
 def home_page():
   st.title("🌐 Google Command Center")
-  st.markdown(
-      "Il tuo hub centrale con tutti i dati storicizzati in modo permanente."
-  )
+  st.markdown("Panoramica generale e stato di salute di tutti i tuoi moduli.")
   st.markdown("---")
 
   tot_spese = (
       df_finanze[df_finanze["Importo (€)"] < 0]["Importo (€)"].sum()
-      if not df_finanze.empty
+      if not df_finanze.empty and "Importo (€)" in df_finanze.columns
       else 0.0
   )
   num_part = len(df_partite) if not df_partite.empty else 0
@@ -156,8 +155,8 @@ def home_page():
 
   st.markdown("---")
   st.info(
-      "💡 Tutte le modifiche e i file caricati rimangono salvati nella cartella"
-      " di sistema."
+      "💡 Ogni area è indipendente: seleziona una sezione dal menu laterale per"
+      " gestire i dati specifici."
   )
 
 
@@ -167,20 +166,31 @@ def finanze_page():
 
   with tab1:
     st.subheader("Movimenti Conto Corrente")
+    global df_finanze
+    # Upload specifico per le finanze
+    up_f = st.file_uploader("Carica file estratti conto (CSV/Excel)", type=["csv", "xlsx"], key="up_fin_file")
+    if up_f is not None:
+      df_new = pd.read_csv(up_f) if up_f.name.endswith(".csv") else pd.read_excel(up_f)
+      df_finanze = pd.concat([df_finanze, df_new], ignore_index=True)
+      df_finanze.to_csv(os.path.join(DATA_DIR, "finanze.csv"), index=False)
+      st.success("Estratto conto aggiunto con successo!")
+      st.rerun()
+
     if not df_finanze.empty:
       st.dataframe(df_finanze, use_container_width=True)
-      df_uscite = df_finanze[df_finanze["Importo (€)"] < 0].copy()
-      df_uscite["Assoluto"] = df_uscite["Importo (€)"].abs()
-      st.bar_chart(df_uscite.groupby("Categoria")["Assoluto"].sum())
+      if "Importo (€)" in df_finanze.columns and "Categoria" in df_finanze.columns:
+        df_uscite = df_finanze[df_finanze["Importo (€)"] < 0].copy()
+        df_uscite["Assoluto"] = df_uscite["Importo (€)"].abs()
+        st.bar_chart(df_uscite.groupby("Categoria")["Assoluto"].sum())
     else:
-      st.warning("Nessun movimento finanziario presente.")
+      st.warning("Nessun movimento finanziario registrato.")
 
   with tab2:
-    st.subheader("Abbonamenti Attivi")
+    st.subheader("Gestione Abbonamenti")
     with st.form("form_abbonamenti"):
       c1, c2, c3 = st.columns(3)
       with c1:
-        servizio = st.text_input("Nome Servizio")
+        servizio = st.text_input("Nome Servizio (es. Netflix)")
       with c2:
         costo = st.number_input("Costo (€)", value=9.99)
       with c3:
@@ -195,12 +205,8 @@ def finanze_page():
             "Scadenza": scad,
         }])
         global df_abbonamenti
-        df_abbonamenti = pd.concat(
-            [df_abbonamenti, nuovo_abb], ignore_index=True
-        )
-        df_abbonamenti.to_csv(
-            os.path.join(DATA_DIR, "abbonamenti.csv"), index=False
-        )
+        df_abbonamenti = pd.concat([df_abbonamenti, nuovo_abb], ignore_index=True)
+        df_abbonamenti.to_csv(os.path.join(DATA_DIR, "abbonamenti.csv"), index=False)
         st.success("Abbonamento salvato!")
         st.rerun()
 
@@ -213,6 +219,7 @@ def sport_page():
   tab1, tab2 = st.tabs(["📋 Partite", "🏃‍♂️ Allenamenti"])
 
   with tab1:
+    st.subheader("Registro Partite")
     with st.form("f_partita"):
       c1, c2, c3 = st.columns(3)
       with c1:
@@ -226,8 +233,8 @@ def sport_page():
         voto = st.slider("Voto", 1.0, 10.0, 6.5)
 
       nota = st.text_area(
-          "Nota / Dettatura Vocale:",
-          placeholder="Usa il microfono della tastiera per dettare...",
+          "Nota / Commento (supporta dettatura vocale da tastiera):",
+          placeholder="Ticca il microfono per dettare...",
       )
 
       if st.form_submit_button("Registra Partita"):
@@ -242,16 +249,15 @@ def sport_page():
         }])
         global df_partite
         df_partite = pd.concat([df_partite, p_new], ignore_index=True)
-        df_partite.to_csv(
-            os.path.join(DATA_DIR, "partite_calcio.csv"), index=False
-        )
-        st.success("Partita salvata permanentemente!")
+        df_partite.to_csv(os.path.join(DATA_DIR, "partite.csv"), index=False)
+        st.success("Partita salvata!")
         st.rerun()
 
     if not df_partite.empty:
       st.dataframe(df_partite, use_container_width=True)
 
   with tab2:
+    st.subheader("Registro Allenamenti")
     with st.form("f_all"):
       da = st.date_input("Data Allenamento", datetime.today())
       ta = st.selectbox(
@@ -264,13 +270,11 @@ def sport_page():
             "Data": str(da),
             "Tipo": ta,
             "Durata (min)": dur,
-            "Note": nota_all,
+            "Nota": nota_all,
         }])
         global df_allenamenti
         df_allenamenti = pd.concat([df_allenamenti, a_new], ignore_index=True)
-        df_allenamenti.to_csv(
-            os.path.join(DATA_DIR, "allenamenti_calcio.csv"), index=False
-        )
+        df_allenamenti.to_csv(os.path.join(DATA_DIR, "allenamenti.csv"), index=False)
         st.success("Allenamento salvato!")
         st.rerun()
 
@@ -301,17 +305,14 @@ def spotify_page():
       }])
       global df_spotify
       df_spotify = pd.concat([df_spotify, s_new], ignore_index=True)
-      df_spotify.to_csv(
-          os.path.join(DATA_DIR, "spotify_ascolti.csv"), index=False
-      )
+      df_spotify.to_csv(os.path.join(DATA_DIR, "spotify.csv"), index=False)
       st.success("Dati Spotify salvati!")
       st.rerun()
 
   if not df_spotify.empty:
     st.dataframe(df_spotify, use_container_width=True)
-    st.bar_chart(
-        df_spotify.groupby("Genere Principale")["Brani Ascoltati"].sum()
-    )
+    if "Genere Principale" in df_spotify.columns and "Brani Ascoltati" in df_spotify.columns:
+      st.bar_chart(df_spotify.groupby("Genere Principale")["Brani Ascoltati"].sum())
 
 
 def lavoro_page():
@@ -320,30 +321,26 @@ def lavoro_page():
 
   with tab1:
     soft = st.selectbox("Software", ["Bpoint", "Zucchetti Paghe", "AdE"])
-    st.text_area(f"Procedure per {soft}:", height=200)
+    st.text_area(f"Procedure operative per {soft}:", height=200)
 
   with tab2:
-    st.session_state.note_personali = st.text_area(
-        "Blocco note libero (supporta dettatura):",
-        value=st.session_state.note_personali,
+    st.session_state.note_lavoro = st.text_area(
+        "Blocco note libero (supporta dettatura vocale):",
+        value=st.session_state.note_lavoro,
         height=250,
     )
 
 
 def task_page():
   st.title("✅ Attività & To-Do List")
-  nuovo = st.text_input("Nuova attività:")
+  nuovo = st.text_input("Nuova attività da completare:")
   if st.button("Aggiungi Task"):
     if nuovo:
-      st.session_state.todo_list.append(
-          {"Attività": nuovo, "Completata": False}
-      )
+      st.session_state.todo_list.append({"Attività": nuovo, "Completata": False})
       st.rerun()
 
   for idx, task in enumerate(st.session_state.todo_list):
-    comp = st.checkbox(
-        task["Attività"], value=task["Completata"], key=f"t_{idx}"
-    )
+    comp = st.checkbox(task["Attività"], value=task["Completata"], key=f"t_{idx}")
     st.session_state.todo_list[idx]["Completata"] = comp
 
 
@@ -360,12 +357,12 @@ def cultura_page():
           "Titolo": tit,
           "Tipologia": tip,
           "Stato": stato,
-          "Voto / Valutazione": voto,
+          "Voto": voto,
       }])
       global df_libri
       df_libri = pd.concat([df_libri, c_new], ignore_index=True)
-      df_libri.to_csv(os.path.join(DATA_DIR, "libri_corsi.csv"), index=False)
-      st.success("Aggiunto!")
+      df_libri.to_csv(os.path.join(DATA_DIR, "libri.csv"), index=False)
+      st.success("Elemento aggiunto!")
       st.rerun()
 
   if not df_libri.empty:
@@ -375,16 +372,14 @@ def cultura_page():
 def link_page():
   st.title("🔑 Link Vault & Portali Rapidi")
   with st.form("f_link"):
-    nome = st.text_input("Nome Portale")
+    nome = st.text_input("Nome Portale (es. Agenzia Entrate)")
     url = st.text_input("URL / Link web")
     note = st.text_input("Note o credenziali")
     if st.form_submit_button("Salva Link"):
-      l_new = pd.DataFrame(
-          [{"Nome Portale": nome, "URL": url, "Note / Credenziali": note}]
-      )
+      l_new = pd.DataFrame([{"Nome Portale": nome, "URL": url, "Note": note}])
       global df_link
       df_link = pd.concat([df_link, l_new], ignore_index=True)
-      df_link.to_csv(os.path.join(DATA_DIR, "link_utili.csv"), index=False)
+      df_link.to_csv(os.path.join(DATA_DIR, "link.csv"), index=False)
       st.success("Link salvato!")
       st.rerun()
 
@@ -392,31 +387,10 @@ def link_page():
     st.dataframe(df_link, use_container_width=True)
 
 
-def archivio_page():
-  st.title("📁 Archivio Documenti")
-  f_up = st.file_uploader(
-      "Carica file nell'archivio", accept_multiple_files=True
-  )
-  if f_up:
-    for f in f_up:
-      st.session_state.archivio_file.append(
-          {"Nome File": f.name, "Dimensione": f"{f.size / 1024:.1f} KB"}
-      )
-    st.success("File caricati!")
-  if st.session_state.archivio_file:
-    st.dataframe(
-        pd.DataFrame(st.session_state.archivio_file), use_container_width=True
-    )
-  else:
-    st.info("Archivio vuoto.")
-
-
-# --- NAVIGAZIONE ST.NAVIGATION ---
+# --- STRUTTURA DI NAVIGAZIONE ORGANIZZATA ---
 pg = st.navigation({
     "Panoramica": [st.Page(home_page, title="🏠 Home", default=True)],
-    "Finanza & Patrimonio": [
-        st.Page(finanze_page, title="💰 Finanze & Abbonamenti")
-    ],
+    "Finanza & Patrimonio": [st.Page(finanze_page, title="💰 Finanze & Abbonamenti")],
     "Sport & Passioni": [
         st.Page(sport_page, title="⚽ Calcio & Match"),
         st.Page(spotify_page, title="🎧 Spotify & Musica"),
@@ -426,7 +400,6 @@ pg = st.navigation({
         st.Page(task_page, title="✅ Attività & To-Do"),
         st.Page(cultura_page, title="📚 Cultura & Libri"),
         st.Page(link_page, title="🔑 Link & Portali"),
-        st.Page(archivio_page, title="📁 Archivio File"),
     ],
 })
 
