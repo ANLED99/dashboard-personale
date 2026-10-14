@@ -351,3 +351,84 @@ def sport_page():
 
       nota = st.text_area(
           "Nota / Commento (supporta dettatura vocale da tastiera):",
+          placeholder="Tocca il microfono per dettare...",
+      )
+
+      if st.form_submit_button("Registra Partita"):
+        p_new = pd.DataFrame([{
+            "Data": str(dp),
+            "Avversario": avv,
+            "Competizione": comp,
+            "Risultato": ris,
+            "Gol Fatti": gol,
+            "Voto": voto,
+            "Nota": nota,
+        }])
+        df_partite = pd.concat([df_partite, p_new], ignore_index=True)
+        salva_dati_modulo("partite.csv", df_partite)
+        st.success("Partita salvata!")
+        st.rerun()
+
+    if not df_partite.empty:
+      st.subheader("Elenco Partite (Modificabili o Eliminabili)")
+      df_part_mod = st.data_editor(
+          df_partite, num_rows="dynamic", use_container_width=True, key="edit_part"
+      )
+      if st.button("💾 Salva Modifiche Partite"):
+        salva_dati_modulo("partite.csv", df_part_mod)
+        st.success("Partite aggiornate!")
+        st.rerun()
+
+  with tab2:
+    st.subheader("Registro Allenamenti")
+    with st.form("f_all"):
+      da = st.date_input("Data Allenamento", datetime.today())
+      ta = st.selectbox(
+          "Tipo", ["Seduta Atletica", "Tattica", "Rifinitura", "Palestra"]
+      )
+      dur = st.number_input("Durata (min)", 90)
+      nota_all = st.text_area("Note allenamento:")
+      if st.form_submit_button("Aggiungi Allenamento"):
+        a_new = pd.DataFrame([{
+            "Data": str(da),
+            "Tipo": ta,
+            "Durata (min)": dur,
+            "Nota": nota_all,
+        }])
+        df_allenamenti = pd.concat([df_allenamenti, a_new], ignore_index=True)
+        salva_dati_modulo("allenamenti.csv", df_allenamenti)
+        st.success("Allenamento salvato!")
+        st.rerun()
+
+    if not df_allenamenti.empty:
+      df_all_mod = st.data_editor(
+          df_allenamenti, num_rows="dynamic", use_container_width=True, key="edit_all"
+      )
+      if st.button("💾 Salva Modifiche Allenamenti"):
+        salva_dati_modulo("allenamenti.csv", df_all_mod)
+        st.success("Allenamenti aggiornati!")
+        st.rerun()
+
+
+def spotify_page():
+  st.title("🎧 Spotify & Statistiche")
+  tab_live, tab_manuale = st.tabs(
+      ["🎵 Connessione API Live", "📊 Storico Manuale"]
+  )
+
+  global df_spotify
+
+  with tab_live:
+    st.subheader("Sincronizzazione Account Spotify")
+    try:
+      auth_manager = SpotifyOAuth(
+          client_id=SPOTIFY_CLIENT_ID,
+          client_secret=SPOTIFY_CLIENT_SECRET,
+          redirect_uri=SPOTIFY_REDIRECT_URI,
+          scope="user-top-read user-read-recently-played",
+          cache_path=".spotify_token_cache",
+      )
+      sp = spotipy.Spotify(auth_manager=auth_manager)
+      top_tracks = sp.current_user_top_tracks(limit=10, time_range="medium_term")
+
+      st.success("
